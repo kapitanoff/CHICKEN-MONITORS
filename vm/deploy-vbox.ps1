@@ -175,7 +175,12 @@ New-Item -ItemType Directory -Path $VMPath -Force | Out-Null
 
 if (Test-Path $SshKeyPath) { Remove-Item $SshKeyPath, "$SshKeyPath.pub" -Force -ErrorAction SilentlyContinue }
 $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-"","" | & ssh-keygen -t ed25519 -f $SshKeyPath -q 2>$null
+# PS 2.0 can't pass empty -N "" correctly; use cmd /c to bypass PowerShell argument mangling
+& cmd /c "ssh-keygen -t ed25519 -f `"$SshKeyPath`" -N `"`" -q" 2>$null
+if (-not (Test-Path "$SshKeyPath.pub")) {
+    # Fallback: try rsa if ed25519 not supported, pipe empty lines for passphrase
+    "","" | & ssh-keygen -t rsa -b 2048 -f $SshKeyPath -q 2>$null
+}
 $ErrorActionPreference = $oldEAP
 $sshPubKey = [System.IO.File]::ReadAllText("$SshKeyPath.pub").Trim()
 Write-Ok "SSH key generated"

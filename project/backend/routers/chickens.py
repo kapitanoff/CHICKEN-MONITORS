@@ -170,6 +170,8 @@ def delete_chicken(
     chicken = db.query(Chicken).filter(Chicken.chicken_id == chicken_id).first()
     if not chicken:
         raise HTTPException(status_code=404, detail="Chicken not found")
+    # Delete readings explicitly (CASCADE may not exist on old DBs)
+    db.query(TemperatureReading).filter(TemperatureReading.chicken_id == chicken_id).delete()
     db.delete(chicken)
     db.commit()
     return {"ok": True}
