@@ -13,7 +13,8 @@ param(
 $ErrorActionPreference = "Stop"
 $VMPath     = "C:\VirtualBox-VMs\Chicken-Monitor"
 $SshKeyPath = Join-Path $VMPath "id_deploy"
-$ProjectDir = Join-Path (Split-Path $PSScriptRoot -Parent) "project"
+$ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectDir = Join-Path (Split-Path -Parent $ScriptDir) "project"
 $Username   = "ubuntu"
 $sshPort    = 2222
 $sshTarget  = "127.0.0.1"
@@ -28,7 +29,8 @@ foreach ($c in $candidates) {
     if (Test-Path $c) { $VBoxManage = $c; break }
 }
 if (-not $VBoxManage) {
-    $VBoxManage = Get-Command VBoxManage -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    $cmd = Get-Command VBoxManage -ErrorAction SilentlyContinue
+    if ($cmd) { $VBoxManage = $cmd.Definition }
 }
 if (-not $VBoxManage) {
     Write-Host "VirtualBox not found." -ForegroundColor Red
@@ -44,7 +46,8 @@ if ($existingVMs -notmatch "`"$VMName`"") {
 
 # Check VM state, start if needed
 $vmInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1
-$vmState = ($vmInfo | Select-String '^VMState="(.+)"').Matches.Groups[1].Value
+$vmStateLine = $vmInfo | Select-String '^VMState="(.+)"'
+$vmState = if ($vmStateLine) { $vmStateLine.Matches[0].Groups[1].Value } else { "unknown" }
 
 if ($vmState -ne "running") {
     Write-Host "Starting VM..." -ForegroundColor Cyan

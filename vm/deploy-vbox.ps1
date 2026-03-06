@@ -34,7 +34,8 @@ $ImgPath       = Join-Path $VMPath "cloud.img"
 $VdiPath       = Join-Path $VMPath "disk.vdi"
 $SeedIso       = Join-Path $VMPath "seed.iso"
 $SshKeyPath    = Join-Path $VMPath "id_deploy"
-$ProjectDir    = Join-Path (Split-Path $PSScriptRoot -Parent) "project"
+$ScriptDir     = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectDir    = Join-Path (Split-Path -Parent $ScriptDir) "project"
 
 function Write-Step  { param($msg) Write-Host "`n[$((Get-Date).ToString('HH:mm:ss'))] $msg" -ForegroundColor Cyan }
 function Write-Ok    { param($msg) Write-Host "  OK: $msg" -ForegroundColor Green }
@@ -52,7 +53,8 @@ foreach ($c in $candidates) {
     if (Test-Path $c) { $VBoxManage = $c; break }
 }
 if (-not $VBoxManage) {
-    $VBoxManage = Get-Command VBoxManage -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    $cmd = Get-Command VBoxManage -ErrorAction SilentlyContinue
+    if ($cmd) { $VBoxManage = $cmd.Definition }
 }
 if (-not $VBoxManage) {
     Write-Err "VirtualBox not found. Install from https://www.virtualbox.org/wiki/Downloads"
@@ -76,7 +78,8 @@ $existingVMs = & $VBoxManage list vms 2>&1
 if ($existingVMs -match "`"$VMName`"") {
     # VM exists — check state and start if needed
     $vmInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1
-    $vmState = ($vmInfo | Select-String '^VMState="(.+)"').Matches.Groups[1].Value
+    $vmStateLine = $vmInfo | Select-String '^VMState="(.+)"'
+    $vmState = if ($vmStateLine) { $vmStateLine.Matches[0].Groups[1].Value } else { "unknown" }
 
     if ($vmState -ne "running") {
         Write-Step "Starting existing VM '$VMName'..."
@@ -136,8 +139,8 @@ Write-Step "Preparing..."
 New-Item -ItemType Directory -Path $VMPath -Force | Out-Null
 
 if (Test-Path $SshKeyPath) { Remove-Item $SshKeyPath, "$SshKeyPath.pub" -Force -ErrorAction SilentlyContinue }
-& ssh-keygen -t ed25519 -f $SshKeyPath -N '""' -q 2>$null
-$sshPubKey = (Get-Content "$SshKeyPath.pub" -Raw).Trim()
+& ssh-keygen -t ed25519 -f $SshKeyPath -N "" -q 2>$null
+$sshPubKey = [System.IO.File]::ReadAllText("$SshKeyPath.pub").Trim()
 Write-Ok "SSH key generated"
 
 # === 3. Download Ubuntu Cloud Image ===
@@ -166,7 +169,8 @@ if (Test-Path $VdiPath) {
         if (Test-Path $q) { $qemuImg = $q; break }
     }
     if (-not $qemuImg) {
-        $qemuImg = Get-Command qemu-img -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+        $cmd = Get-Command qemu-img -ErrorAction SilentlyContinue
+        if ($cmd) { $qemuImg = $cmd.Definition }
     }
 
     if ($qemuImg) {
@@ -244,7 +248,8 @@ runcmd:
 $isoCreated = $false
 
 # Method 1: oscdimg (comes with Windows ADK)
-$oscdimg = Get-Command oscdimg -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+$oscdimgCmd = Get-Command oscdimg -ErrorAction SilentlyContinue
+$oscdimg = if ($oscdimgCmd) { $oscdimgCmd.Definition } else { $null }
 if (-not $oscdimg) {
     $adkPaths = @(
         "${env:ProgramFiles(x86)}\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe",
@@ -262,9 +267,11 @@ if ($oscdimg) {
 
 # Method 2: mkisofs / genisoimage (from cdrtools)
 if (-not $isoCreated) {
-    $mkisofs = Get-Command mkisofs -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    $cmd = Get-Command mkisofs -ErrorAction SilentlyContinue
+    $mkisofs = if ($cmd) { $cmd.Definition } else { $null }
     if (-not $mkisofs) {
-        $mkisofs = Get-Command genisoimage -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+        $cmd = Get-Command genisoimage -ErrorAction SilentlyContinue
+        $mkisofs = if ($cmd) { $cmd.Definition } else { $null }
     }
     if ($mkisofs) {
         & $mkisofs -output $SeedIso -volid cidata -joliet -rock "$ciDir"
