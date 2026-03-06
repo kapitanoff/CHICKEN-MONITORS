@@ -88,6 +88,16 @@ function Invoke-VBox {
 # === 1. Check if VM already exists ===
 Write-Step "Checking prerequisites..."
 
+# Clean up any stale media from VirtualBox registry (prevents UUID conflicts on re-runs)
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+foreach ($ext in @("*.vmdk", "*.vdi")) {
+    $staleFiles = Get-ChildItem $VMPath -Filter $ext -ErrorAction SilentlyContinue
+    foreach ($f in $staleFiles) {
+        & $VBoxManage closemedium disk $f.FullName 2>$null
+    }
+}
+$ErrorActionPreference = $oldEAP
+
 $existingVMs = & $VBoxManage list vms 2>&1
 if ($existingVMs -match "`"$VMName`"") {
     # VM exists — check state and start if needed
@@ -217,10 +227,12 @@ if (Test-Path $VdiPath) {
     $VmdkPath = Join-Path $VMPath $vmdkFile
     Write-Ok "Extracted: $vmdkFile"
 
-    # Unregister any leftover media with same path (handles re-runs)
+    # Reset VMDK UUID to avoid conflicts with VirtualBox media registry
     $oldEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     & $VBoxManage closemedium disk $VdiPath 2>$null
+    & $VBoxManage closemedium disk $VmdkPath 2>$null
+    & $VBoxManage internalcommands sethduuid $VmdkPath 2>$null
     $ErrorActionPreference = $oldEAP
 
     # Convert VMDK to VDI (VBoxManage natively supports VMDK)
