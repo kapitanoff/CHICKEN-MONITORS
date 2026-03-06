@@ -1,8 +1,10 @@
 <#
 .SYNOPSIS
     Update Chicken Monitor on existing VirtualBox VM.
+    Compatible with PowerShell 2.0 (Windows 7).
 .NOTES
     Run: .\update-vbox.ps1
+    Reset DB: .\update-vbox.ps1 -ResetDB
 #>
 
 param(
@@ -44,21 +46,27 @@ if (-not $VBoxManage) {
 }
 
 # Check VM exists
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 $existingVMs = & $VBoxManage list vms 2>&1
+$ErrorActionPreference = $oldEAP
 if ($existingVMs -notmatch "`"$VMName`"") {
     Write-Host "VM '$VMName' not found. Run deploy-vbox.ps1 first." -ForegroundColor Red
     exit 1
 }
 
 # Check VM state, start if needed
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 $vmInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1
+$ErrorActionPreference = $oldEAP
 $vmStateLine = $vmInfo | Select-String '^VMState="(.+)"' | Select-Object -First 1
 $vmState = "unknown"
 if ($vmStateLine) { $vmState = $vmStateLine.Matches[0].Groups[1].Value }
 
 if ($vmState -ne "running") {
     Write-Host "Starting VM..." -ForegroundColor Cyan
-    & $VBoxManage startvm $VMName --type headless
+    $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    & $VBoxManage startvm $VMName --type headless 2>&1
+    $ErrorActionPreference = $oldEAP
     Start-Sleep -Seconds 15
 }
 
@@ -87,17 +95,24 @@ $sshOpts = @("-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/nu
 # Archive and copy project
 Write-Host "Copying project..." -ForegroundColor Cyan
 $archivePath = Join-Path $VMPath "project.tar.gz"
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 & tar --force-local -czf $archivePath --exclude=.git --exclude=deploy.ps1 --exclude=deploy-vbox.ps1 -C $ProjectDir .
+$ErrorActionPreference = $oldEAP
+
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $SshKeyPath -P $sshPort "$archivePath" "${Username}@${sshTarget}:/home/$Username/project.tar.gz"
+$ErrorActionPreference = $oldEAP
 
 # Extract and rebuild
 Write-Host "Rebuilding containers..." -ForegroundColor Cyan
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 if ($ResetDB) {
     Write-Host "  Resetting database (volumes will be recreated)..." -ForegroundColor Yellow
     & ssh @sshOpts "${Username}@${sshTarget}" "cd /home/$Username/chicken-monitor && tar -xzf /home/$Username/project.tar.gz && rm /home/$Username/project.tar.gz && sudo docker compose down -v && sudo docker compose up -d --build"
 } else {
     & ssh @sshOpts "${Username}@${sshTarget}" "cd /home/$Username/chicken-monitor && tar -xzf /home/$Username/project.tar.gz && rm /home/$Username/project.tar.gz && sudo docker compose up -d --build"
 }
+$ErrorActionPreference = $oldEAP
 
 Write-Host ""
 Write-Host "Updated! http://localhost:8080" -ForegroundColor Green

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Path
+from fastapi import APIRouter, Depends, Query, Path, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, Integer, case
@@ -160,3 +160,16 @@ def get_history(
         }
         for r in results
     ]
+
+
+@router.delete("/chickens/{chicken_id}")
+def delete_chicken(
+    chicken_id: str = Path(..., min_length=1, max_length=32, pattern=r'^[\w\-]+$'),
+    db: Session = Depends(get_db),
+):
+    chicken = db.query(Chicken).filter(Chicken.chicken_id == chicken_id).first()
+    if not chicken:
+        raise HTTPException(status_code=404, detail="Chicken not found")
+    db.delete(chicken)
+    db.commit()
+    return {"ok": True}

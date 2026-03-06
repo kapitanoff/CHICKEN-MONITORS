@@ -19,6 +19,7 @@
   - [Установка](#1-установите-docker)
   - [Повторный запуск](#повторный-запуск)
   - [Остановить / удалить](#остановить--удалить)
+- [Веб-интерфейс](#веб-интерфейс)
 - [Датчики](#датчики)
 
 ---
@@ -27,7 +28,7 @@
 
 Файл `project/.env` — настройки проекта. **Без него проект не запустится.**
 
-Скрипт `setup.ps1` создаёт его автоматически. Можно также создать вручную — откройте Блокнот, вставьте текст ниже, заполните и сохраните как `project/.env`:
+На **Windows 7** используйте скрипт `setup-win7.ps1`, на Windows 10+ — `setup.ps1`. Можно также создать вручную — откройте Блокнот, вставьте текст ниже, заполните и сохраните как `project/.env`:
 
 ```
 MQTT_HOST=
@@ -44,6 +45,8 @@ TEMP_GREEN_MIN=40.0
 TEMP_GREEN_MAX=42.0
 TEMP_YELLOW_MAX=43.0
 ```
+
+> **Важно (Windows 7):** Блокнот на Win7 может записать всё в одну строку. Убедитесь, что каждый параметр на отдельной строке. Или используйте `setup-win7.ps1` — он создаст файл правильно.
 
 | Параметр | Что писать |
 |----------|-----------|
@@ -93,20 +96,27 @@ Win+R → `powershell` → Enter. Выполните:
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
 ```
 
-### 5. Настройте проект
+### 5. Настройте .env
 
+**Windows 7:**
+```powershell
+cd C:\Chicken-Monitor\project
+.\setup-win7.ps1
+```
+
+**Windows 10/11:**
 ```powershell
 cd C:\Chicken-Monitor\project
 .\setup.ps1
 ```
 
-Введите данные MQTT-брокера. На **«Start Chicken Monitor now?»** ответьте **n**.
+Введите данные MQTT-брокера. На Windows 10+ на **«Start Chicken Monitor now?»** ответьте **n**.
 
 ### 6. Запустите виртуальную машину
 
 ```powershell
-cd C:\Chicken-Monitor
-.\vm\deploy-vbox.ps1
+cd C:\Chicken-Monitor\vm
+.\deploy-vbox.ps1
 ```
 
 Придумайте пароль когда спросит. Ждите 5–15 минут.
@@ -120,21 +130,29 @@ http://localhost:8080
 ### Повторный запуск после перезагрузки
 
 ```powershell
-cd C:\Chicken-Monitor
-.\vm\deploy-vbox.ps1
+cd C:\Chicken-Monitor\vm
+.\deploy-vbox.ps1
 ```
+
+Скрипт увидит что ВМ уже есть и просто запустит её.
 
 ### Обновление
 
 ```powershell
-cd C:\Chicken-Monitor\project
-.\setup.ps1
-cd C:\Chicken-Monitor
-.\vm\update-vbox.ps1
+cd C:\Chicken-Monitor\vm
+.\update-vbox.ps1
+```
+
+Для сброса базы данных (удалит все данные куриц):
+```powershell
+.\update-vbox.ps1 -ResetDB
 ```
 
 ### Выключить / удалить
 
+Через VirtualBox GUI: правой кнопкой на ВМ → «Закрыть» / «Удалить» → «Удалить все файлы».
+
+Или через PowerShell:
 ```powershell
 # Выключить
 & 'C:\Program Files\Oracle\VirtualBox\VBoxManage.exe' controlvm 'Chicken-Monitor' acpipowerbutton
@@ -171,8 +189,8 @@ winget install SoftwareFreedomConservancy.QEMU
 ```powershell
 cd C:\Chicken-Monitor\project
 .\setup.ps1
-cd C:\Chicken-Monitor
-.\vm\deploy.ps1
+cd C:\Chicken-Monitor\vm
+.\deploy.ps1
 ```
 
 На **«Start Chicken Monitor now?»** ответьте **n**. Скрипт покажет IP-адрес → откройте `http://<IP>:8000`.
@@ -180,8 +198,8 @@ cd C:\Chicken-Monitor
 ### Обновление
 
 ```powershell
-cd C:\Chicken-Monitor
-.\vm\update.ps1
+cd C:\Chicken-Monitor\vm
+.\update.ps1
 ```
 
 ### Выключить / удалить
@@ -253,6 +271,18 @@ docker compose down
 # Удалить вместе с данными
 docker compose down -v
 ```
+
+---
+
+## Веб-интерфейс
+
+- Карточки куриц с цветовой индикацией (зелёный / жёлтый / красный)
+- График температуры при клике на курицу (с тултипами — наведите на точку для подробностей)
+- Группировка по загонам (кнопка «По загонам»)
+- Управление загонами (создание, переименование, удаление)
+- Назначение курицы в загон (выпадающий список в карточке)
+- Удаление курицы (кнопка «Удалить» в карточке)
+- Настройка порогов температуры (шестерёнка в шапке)
 
 ---
 

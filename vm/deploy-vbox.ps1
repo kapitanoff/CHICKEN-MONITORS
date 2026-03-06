@@ -98,10 +98,14 @@ foreach ($ext in @("*.vmdk", "*.vdi")) {
 }
 $ErrorActionPreference = $oldEAP
 
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 $existingVMs = & $VBoxManage list vms 2>&1
+$ErrorActionPreference = $oldEAP
 if ($existingVMs -match "`"$VMName`"") {
     # VM exists — check state and start if needed
+    $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     $vmInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1
+    $ErrorActionPreference = $oldEAP
     $vmStateLine = $vmInfo | Select-String '^VMState="(.+)"' | Select-Object -First 1
     $vmState = "unknown"
     if ($vmStateLine) { $vmState = $vmStateLine.Matches[0].Groups[1].Value }
@@ -121,13 +125,17 @@ if ($existingVMs -match "`"$VMName`"") {
     while (-not $ip -and $elapsed -lt 120) {
         Start-Sleep -Seconds 5
         $elapsed += 5
+        $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         $propResult = & $VBoxManage guestproperty get $VMName "/VirtualBox/GuestInfo/Net/0/V4/IP" 2>&1
+        $ErrorActionPreference = $oldEAP
         if ($propResult -match 'Value:\s*(\d+\.\d+\.\d+\.\d+)') {
             $ip = $Matches[1]
         }
         # Fallback: parse DHCP leases via port forwarding — we use port forward so IP = localhost
         if (-not $ip) {
+            $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
             $fwdRules = & $VBoxManage showvminfo $VMName --machinereadable 2>&1 | Select-String "Forwarding"
+            $ErrorActionPreference = $oldEAP
             if ($fwdRules -match "ssh") {
                 # We have port forwarding set up, use localhost
                 $ip = "127.0.0.1"
@@ -137,7 +145,9 @@ if ($existingVMs -match "`"$VMName`"") {
 
     # Determine SSH port (could be forwarded)
     $sshPort = 22
+    $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     $fwdInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1 | Select-String "Forwarding.*ssh"
+    $ErrorActionPreference = $oldEAP
     if ($fwdInfo -match ",(\d+),,22") {
         $sshPort = $Matches[1]
         $ip = "127.0.0.1"
@@ -165,7 +175,7 @@ New-Item -ItemType Directory -Path $VMPath -Force | Out-Null
 
 if (Test-Path $SshKeyPath) { Remove-Item $SshKeyPath, "$SshKeyPath.pub" -Force -ErrorAction SilentlyContinue }
 $oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-& ssh-keygen -t ed25519 -f $SshKeyPath -N "" -q 2>$null
+"","" | & ssh-keygen -t ed25519 -f $SshKeyPath -q 2>$null
 $ErrorActionPreference = $oldEAP
 $sshPubKey = [System.IO.File]::ReadAllText("$SshKeyPath.pub").Trim()
 Write-Ok "SSH key generated"

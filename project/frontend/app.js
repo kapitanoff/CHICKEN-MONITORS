@@ -338,6 +338,26 @@ document.getElementById('modal-group-select').addEventListener('change', async (
     }
 });
 
+// Обработчик удаления курицы
+document.getElementById('btn-delete-chicken').addEventListener('click', async () => {
+    if (!selectedChicken) return;
+    if (!confirm(`Удалить курицу #${selectedChicken}? Все данные температуры будут удалены.`)) return;
+    try {
+        const res = await fetch(`/api/chickens/${encodeURIComponent(selectedChicken)}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            closeModal();
+            await loadChickens();
+        } else {
+            alert('Ошибка удаления курицы');
+        }
+    } catch (err) {
+        console.error('Ошибка удаления курицы:', err);
+        alert('Ошибка удаления курицы');
+    }
+});
+
 // Загружает историю и строит график
 async function loadChart(chickenId, hours) {
     let history;
@@ -352,12 +372,23 @@ async function loadChart(chickenId, hours) {
     }
 
     // Подписи оси X — время в формате ЧЧ:ММ
+    // Полные метки для тултипов (дата + время с секундами)
+    const fullLabels = history.map(r => {
+        const d = new Date(r.timestamp);
+        return d.toLocaleString('ru-RU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    });
+
+    // Короткие метки для оси X
     const labels = history.map(r => {
         const d = new Date(r.timestamp);
         return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     });
 
     const temps = history.map(r => r.temperature);
+    const voltages = history.map(r => r.voltage);
 
     // Удаляем старый график перед созданием нового
     if (chartInstance) chartInstance.destroy();
@@ -386,15 +417,42 @@ async function loadChart(chickenId, hours) {
                 backgroundColor: 'rgba(233, 69, 96, 0.08)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: history.length > 100 ? 0 : 3,
-                pointHoverRadius: 5
+                pointRadius: history.length > 200 ? 0 : history.length > 50 ? 2 : 4,
+                pointHoverRadius: 7,
+                pointBackgroundColor: '#e94560',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 1
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'nearest',
+                intersect: false
+            },
             plugins: {
-                legend: { labels: { color: '#aaa', font: { size: 12 } } }
+                legend: { labels: { color: '#aaa', font: { size: 12 } } },
+                tooltip: {
+                    backgroundColor: 'rgba(20, 20, 50, 0.95)',
+                    titleColor: '#fff',
+                    bodyColor: '#ddd',
+                    borderColor: '#e94560',
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: false,
+                    callbacks: {
+                        title: function(items) {
+                            return fullLabels[items[0].dataIndex];
+                        },
+                        label: function(item) {
+                            const lines = [`Температура: ${item.raw.toFixed(2)} °C`];
+                            const v = voltages[item.dataIndex];
+                            if (v != null) lines.push(`Напряжение: ${v.toFixed(2)} V`);
+                            return lines;
+                        }
+                    }
+                }
             },
             scales: {
                 x: {
