@@ -74,7 +74,9 @@ TEMP_YELLOW_MAX=43.0
 
 На Windows 7 нет встроенных утилит `ssh`, `scp`, `tar` — они нужны скрипту для работы с виртуальной машиной. Git for Windows включает их все.
 
-Скачайте и установите: https://git-scm.com/download/win
+Скачайте и установите **Git 2.46.2** (последняя версия для Windows 7): https://github.com/git-for-windows/git/releases/download/v2.46.2.windows.1/Git-2.46.2-64-bit.exe
+
+> Новые версии Git (2.47+) не поддерживают Windows 7.
 
 При установке оставьте все настройки по умолчанию.
 
