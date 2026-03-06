@@ -38,8 +38,8 @@ if ((Test-Path $gitUsrBin) -and ($env:Path -notlike "*$gitUsrBin*")) {
 # Try to enable TLS 1.2 (best-effort; on Win7 CLR 2.0 this may not work — curl.exe is used instead)
 try { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { }
 
-$CloudImageUrl = "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img"
-$ImgPath       = Join-Path $VMPath "cloud.img"
+$CloudImageUrl = "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.ova"
+$OvaPath       = Join-Path $VMPath "cloud.ova"
 $VdiPath       = Join-Path $VMPath "disk.vdi"
 $SeedIso       = Join-Path $VMPath "seed.iso"
 $SshKeyPath    = Join-Path $VMPath "id_deploy"
@@ -158,17 +158,16 @@ if (Test-Path $SshKeyPath) { Remove-Item $SshKeyPath, "$SshKeyPath.pub" -Force -
 $sshPubKey = [System.IO.File]::ReadAllText("$SshKeyPath.pub").Trim()
 Write-Ok "SSH key generated"
 
-# === 3. Download Ubuntu Cloud Image ===
+# === 3. Download Ubuntu Cloud Image (OVA) and convert to VDI ===
 if (Test-Path $VdiPath) {
     Write-Ok "VDI already exists, skipping download"
 } else {
-    Write-Step "Downloading Ubuntu 22.04 Cloud Image (~700MB)..."
+    Write-Step "Downloading Ubuntu 22.04 Cloud Image OVA (~650MB)..."
     Write-Host "  URL: $CloudImageUrl"
 
     # Use Git's bundled curl.exe (supports TLS 1.2 natively, works on Windows 7)
     $gitCurl = "C:\Program Files\Git\mingw64\bin\curl.exe"
     if (-not (Test-Path $gitCurl)) {
-        # Try 32-bit Git
         $gitCurl = "C:\Program Files (x86)\Git\mingw64\bin\curl.exe"
     }
     if (-not (Test-Path $gitCurl)) {
@@ -178,18 +177,17 @@ if (Test-Path $VdiPath) {
 
     if (Test-Path $gitCurl) {
         Write-Host "  Using: $gitCurl" -ForegroundColor Gray
-        & $gitCurl -L -o $ImgPath $CloudImageUrl --progress-bar
+        & $gitCurl -L -o $OvaPath $CloudImageUrl --progress-bar
         if ($LASTEXITCODE -ne 0) {
             Write-Err "curl download failed (exit code $LASTEXITCODE)"
             exit 1
         }
-        Write-Ok "Downloaded: $ImgPath"
+        Write-Ok "Downloaded OVA"
     } else {
-        # Fallback: try .NET WebClient (won't work on Win7 CLR 2.0 with HTTPS)
         try {
             $webClient = New-Object System.Net.WebClient
-            $webClient.DownloadFile($CloudImageUrl, $ImgPath)
-            Write-Ok "Downloaded: $ImgPath"
+            $webClient.DownloadFile($CloudImageUrl, $OvaPath)
+            Write-Ok "Downloaded OVA"
         } catch {
             Write-Err "Download failed. Install Git for Windows first (provides curl with TLS 1.2)."
             Write-Host "  Git 2.46.2: https://github.com/git-for-windows/git/releases/download/v2.46.2.windows.1/Git-2.46.2-64-bit.exe" -ForegroundColor Yellow
@@ -197,35 +195,37 @@ if (Test-Path $VdiPath) {
         }
     }
 
-    # Check for qemu-img to convert
-    $qemuImg = $null
-    $qemuCandidates = @(
-        "C:\Program Files\qemu\qemu-img.exe",
-        "C:\Program Files (x86)\qemu\qemu-img.exe"
-    )
-    foreach ($q in $qemuCandidates) {
-        if (Test-Path $q) { $qemuImg = $q; break }
+    # OVA is a tar archive containing a VMDK disk image
+    Write-Step "Extracting VMDK from OVA..."
+    $vmdkFile = $null
+    $tarList = & tar -tf $OvaPath 2>&1
+    foreach ($entry in $tarList) {
+        if ("$entry" -match '\.vmdk$') { $vmdkFile = "$entry".Trim(); break }
     }
-    if (-not $qemuImg) {
-        $cmd = Get-Command qemu-img -ErrorAction SilentlyContinue
-        if ($cmd) { $qemuImg = $cmd.Definition }
+    if (-not $vmdkFile) {
+        Write-Err "No VMDK found inside OVA"
+        exit 1
     }
+    & tar -xf $OvaPath -C $VMPath $vmdkFile
+    $VmdkPath = Join-Path $VMPath $vmdkFile
+    Write-Ok "Extracted: $vmdkFile"
 
-    if ($qemuImg) {
-        Write-Step "Converting IMG to VDI via qemu-img..."
-        & $qemuImg convert -f qcow2 -O vdi $ImgPath $VdiPath
-        if ($LASTEXITCODE -ne 0) {
-            Write-Err "qemu-img conversion failed"
-            exit 1
-        }
-    } else {
-        Write-Step "Converting IMG to VDI via VBoxManage..."
-        # Cloud image is qcow2, not raw — use clonemedium (supports qcow2 input)
-        Invoke-VBox @("clonemedium", "disk", $ImgPath, $VdiPath, "--format", "VDI")
-    }
+    # Unregister any leftover media with same path (handles re-runs)
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $VBoxManage closemedium disk $VdiPath 2>$null
+    $ErrorActionPreference = $oldEAP
 
-    Remove-Item $ImgPath -Force -ErrorAction SilentlyContinue
+    # Convert VMDK to VDI (VBoxManage natively supports VMDK)
+    Write-Step "Converting VMDK to VDI..."
+    Invoke-VBox @("clonemedium", "disk", $VmdkPath, $VdiPath, "--format", "VDI")
     Write-Ok "Converted to VDI"
+
+    # Clean up temp files
+    Remove-Item $OvaPath -Force -ErrorAction SilentlyContinue
+    Remove-Item $VmdkPath -Force -ErrorAction SilentlyContinue
+    # Also remove .ovf if extracted
+    Get-ChildItem $VMPath -Filter "*.ovf" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 # Resize disk
