@@ -1,78 +1,122 @@
 # Chicken Monitor
 
-Система мониторинга температуры кур в реальном времени.
+Мониторинг температуры кур в реальном времени.
 
-## Что умеет
+## Оглавление
 
-- Показывает температуру и заряд батареи каждого датчика
-- Подсвечивает статус цветом: зелёный = норма, жёлтый = внимание, красный = опасно
-- Графики температуры за любой период (от 1 часа до 1 года)
-- Группировка куриц по загонам
-- Автоматическое обновление данных каждые 3 секунды
+- [Файл настроек .env](#файл-настроек-env)
+- [Способ 1. VirtualBox (Windows 7 и выше)](#способ-1-virtualbox-windows-7-и-выше)
+  - [Установка](#1-установите-virtualbox)
+  - [Git для Windows 7](#2-установите-git-только-для-windows-7)
+  - [Повторный запуск](#повторный-запуск-после-перезагрузки)
+  - [Обновление](#обновление)
+  - [Выключить / удалить](#выключить--удалить)
+- [Способ 2. Hyper-V (только Windows 10/11 Pro)](#способ-2-hyper-v-только-windows-1011-pro)
+  - [Установка](#1-включите-hyper-v)
+  - [Обновление](#обновление-1)
+  - [Выключить / удалить](#выключить--удалить-1)
+- [Способ 3. Docker (Linux / Mac / Windows 10+)](#способ-3-docker-linux--mac--windows-10)
+  - [Установка](#1-установите-docker)
+  - [Повторный запуск](#повторный-запуск)
+  - [Остановить / удалить](#остановить--удалить)
+- [Датчики](#датчики)
 
-## Установка (VirtualBox — для Windows 7 и выше)
+---
 
-### Шаг 1. Установите VirtualBox
+## Файл настроек `.env`
 
-- Windows 7: скачайте **VirtualBox 6.1** с https://www.virtualbox.org/wiki/Download_Old_Builds_6_1 (пункт «Windows hosts»)
-- Windows 10/11: скачайте **VirtualBox 7.x** с https://www.virtualbox.org/wiki/Downloads
+Файл `project/.env` — настройки проекта. **Без него проект не запустится.**
 
-Установите как обычную программу.
+Скрипт `setup.ps1` создаёт его автоматически. Можно также создать вручную — откройте Блокнот, вставьте текст ниже, заполните и сохраните как `project/.env`:
 
-### Шаг 2. Скачайте проект
+```
+MQTT_HOST=
+MQTT_PORT=1883
+MQTT_USERNAME=
+MQTT_PASSWORD=
 
-Скачайте ZIP с репозитория или клонируйте через git. Распакуйте в любую папку, например `C:\Chicken-Monitor`.
+POSTGRES_USER=chicken
+POSTGRES_PASSWORD=chickenpass2024
+POSTGRES_DB=chicken_monitor
+DATABASE_URL=postgresql+psycopg://chicken:chickenpass2024@localhost/chicken_monitor
 
-### Шаг 3. Настройте MQTT
+TEMP_GREEN_MIN=40.0
+TEMP_GREEN_MAX=42.0
+TEMP_YELLOW_MAX=43.0
+```
 
-Откройте **PowerShell**. Для этого нажмите Win+R, введите `powershell`, нажмите Enter.
+| Параметр | Что писать |
+|----------|-----------|
+| `MQTT_HOST` | IP-адрес MQTT-брокера — узнайте у того, кто настраивал датчики |
+| `MQTT_PORT` | Порт брокера. Если не знаете — оставьте `1883` |
+| `MQTT_USERNAME` | Логин от брокера. Нет авторизации — оставьте пустым |
+| `MQTT_PASSWORD` | Пароль от брокера. Нет авторизации — оставьте пустым |
+| `POSTGRES_USER` | Можно не менять |
+| `POSTGRES_PASSWORD` | Можно не менять |
+| `POSTGRES_DB` | Можно не менять |
+| `DATABASE_URL` | Можно не менять. Если меняли `POSTGRES_USER` или `POSTGRES_PASSWORD` — подставьте их по шаблону |
+| `TEMP_GREEN_MIN` | Ниже этого — опасно (красный). По умолчанию `40.0` |
+| `TEMP_GREEN_MAX` | Выше этого — предупреждение (жёлтый). По умолчанию `42.0` |
+| `TEMP_YELLOW_MAX` | Выше этого — опасно (красный). По умолчанию `43.0` |
 
-Если PowerShell выдаёт ошибку **«Выполнение скриптов запрещено»**, выполните:
+Пороги можно менять прямо в веб-интерфейсе — шестерёнка в шапке.
+
+---
+
+## Способ 1. VirtualBox (Windows 7 и выше)
+
+### 1. Установите VirtualBox
+
+- Windows 7: https://www.virtualbox.org/wiki/Download_Old_Builds_6_1 → «Windows hosts»
+- Windows 10/11: https://www.virtualbox.org/wiki/Downloads
+
+### 2. Установите Git (только для Windows 7)
+
+На Windows 7 нет встроенных утилит `ssh`, `scp`, `tar` — они нужны скрипту для работы с виртуальной машиной. Git for Windows включает их все.
+
+Скачайте и установите: https://git-scm.com/download/win
+
+При установке оставьте все настройки по умолчанию.
+
+> На Windows 10/11 этот шаг не нужен — там всё есть из коробки.
+
+### 3. Скачайте проект
+
+Скачайте ZIP с репозитория, распакуйте, например в `C:\Chicken-Monitor`.
+
+### 4. Откройте PowerShell
+
+Win+R → `powershell` → Enter. Выполните:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
 ```
 
-Перейдите в папку проекта (укажите путь туда, куда вы распаковали проект):
+### 5. Настройте проект
+
 ```powershell
 cd C:\Chicken-Monitor\project
-```
-
-Запустите настройку:
-```powershell
 .\setup.ps1
 ```
 
-Скрипт спросит:
-- **IP-адрес MQTT-брокера** — адрес вашего брокера в сети
-- **Порт** — обычно 1883, просто нажмите Enter
-- **Логин и пароль MQTT** — если на брокере есть авторизация
-- **Пороги температуры** — нажмите Enter чтобы оставить по умолчанию
+Введите данные MQTT-брокера. На **«Start Chicken Monitor now?»** ответьте **n**.
 
-На вопрос **«Start Chicken Monitor now?»** ответьте **n** (мы запустим через виртуальную машину).
+### 6. Запустите виртуальную машину
 
-### Шаг 4. Запустите виртуальную машину
-
-В том же PowerShell перейдите в корень проекта и запустите деплой (укажите путь туда, куда вы распаковали проект):
 ```powershell
 cd C:\Chicken-Monitor
 .\vm\deploy-vbox.ps1
 ```
 
-Скрипт спросит пароль — придумайте любой. Дальше всё произойдёт автоматически:
-- Скачается Ubuntu (~700 МБ)
-- Создастся виртуальная машина
-- Установится Docker
-- Запустится система мониторинга
+Придумайте пароль когда спросит. Ждите 5–15 минут.
 
-Это занимает 5–15 минут. После завершения откройте в браузере:
+### 7. Откройте в браузере
 
 ```
 http://localhost:8080
 ```
 
-### Повторный запуск
+### Повторный запуск после перезагрузки
 
-После перезагрузки компьютера виртуальная машина выключается. Чтобы запустить снова, откройте PowerShell и выполните (укажите путь туда, куда вы распаковали проект):
 ```powershell
 cd C:\Chicken-Monitor
 .\vm\deploy-vbox.ps1
@@ -80,7 +124,6 @@ cd C:\Chicken-Monitor
 
 ### Обновление
 
-Если изменили настройки MQTT или обновили код:
 ```powershell
 cd C:\Chicken-Monitor\project
 .\setup.ps1
@@ -88,51 +131,49 @@ cd C:\Chicken-Monitor
 .\vm\update-vbox.ps1
 ```
 
-### Выключение и удаление
+### Выключить / удалить
 
-Выключить виртуальную машину:
 ```powershell
+# Выключить
 & 'C:\Program Files\Oracle\VirtualBox\VBoxManage.exe' controlvm 'Chicken-Monitor' acpipowerbutton
-```
 
-Полностью удалить:
-```powershell
+# Удалить полностью
 & 'C:\Program Files\Oracle\VirtualBox\VBoxManage.exe' unregistervm 'Chicken-Monitor' --delete
 ```
 
 ---
 
-## Установка (Hyper-V — только Windows 10/11 Pro)
+## Способ 2. Hyper-V (только Windows 10/11 Pro)
 
-Если у вас Windows 10/11 Pro, можно использовать Hyper-V вместо VirtualBox.
+### 1. Включите Hyper-V
 
-### Подготовка
-
-Включите Hyper-V (PowerShell от администратора):
+PowerShell **от имени администратора**:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
 ```
+Перезагрузите компьютер.
 
-Установите qemu-img:
+### 2. Установите qemu-img
+
 ```powershell
 winget install SoftwareFreedomConservancy.QEMU
 ```
 
-### Запуск
+### 3. Скачайте проект
+
+Скачайте ZIP, распакуйте в `C:\Chicken-Monitor`.
+
+### 4. Настройте и запустите
 
 ```powershell
 cd C:\Chicken-Monitor\project
 .\setup.ps1
-
 cd C:\Chicken-Monitor
 .\vm\deploy.ps1
 ```
 
-В конце скрипт покажет IP-адрес. Откройте в браузере:
-```
-http://<IP-адрес>:8000
-```
+На **«Start Chicken Monitor now?»** ответьте **n**. Скрипт покажет IP-адрес → откройте `http://<IP>:8000`.
 
 ### Обновление
 
@@ -141,14 +182,13 @@ cd C:\Chicken-Monitor
 .\vm\update.ps1
 ```
 
-### Выключение и удаление
+### Выключить / удалить
 
 ```powershell
+# Выключить
 Stop-VM -Name 'Chicken-Monitor'
-```
 
-Полностью удалить:
-```powershell
+# Удалить полностью
 Stop-VM 'Chicken-Monitor' -Force
 Remove-VM 'Chicken-Monitor' -Force
 Remove-Item 'C:\Hyper-V\Chicken-Monitor' -Recurse -Force
@@ -156,42 +196,40 @@ Remove-Item 'C:\Hyper-V\Chicken-Monitor' -Recurse -Force
 
 ---
 
-## Установка (Docker — Linux/Mac/Windows 10+)
+## Способ 3. Docker (Linux / Mac / Windows 10+)
 
-Если на компьютере уже установлен Docker, можно запустить без виртуальной машины. Этот способ подходит для Linux, Mac и Windows 10+ с Docker Desktop.
+### 1. Установите Docker
 
-### Шаг 1. Установите Docker
+- Linux: https://docs.docker.com/engine/install/
+- Mac / Windows 10+: https://www.docker.com/products/docker-desktop/
 
-- **Linux:** https://docs.docker.com/engine/install/
-- **Mac / Windows 10+:** https://www.docker.com/products/docker-desktop/
+### 2. Скачайте проект
 
-Убедитесь что Docker запущен (иконка Docker в трее / `docker --version` в терминале).
+Скачайте ZIP, распакуйте в любую папку.
 
-### Шаг 2. Скачайте проект
+### 3. Настройте и запустите
 
-Скачайте ZIP с репозитория или клонируйте через git. Распакуйте в любую папку.
+**Windows:**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
+cd C:\Chicken-Monitor\project
+.\setup.ps1
+```
 
-### Шаг 3. Настройте и запустите
-
-**Linux / Mac** — откройте терминал:
+**Linux / Mac:**
 ```bash
 cd /путь/к/Chicken-Monitor/project
 ./setup.sh
 ```
 
-**Windows** — откройте PowerShell (если скрипты запрещены, сначала выполните `Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser`):
-```powershell
-cd C:\Chicken-Monitor\project
-.\setup.ps1
+На **«Start Chicken Monitor now?»** ответьте **Y**.
+
+Или запустите вручную:
+```bash
+docker compose up -d --build
 ```
 
-Скрипт спросит настройки MQTT и пароль базы данных. На вопрос **«Start Chicken Monitor now?»** ответьте **Y**.
-
-Скрипт автоматически запустит `docker compose up`, который поднимет:
-- **PostgreSQL** — база данных для хранения показаний
-- **Backend** — FastAPI-сервер + MQTT-клиент + веб-интерфейс
-
-### Шаг 4. Откройте в браузере
+### 4. Откройте в браузере
 
 ```
 http://localhost:8000
@@ -199,52 +237,30 @@ http://localhost:8000
 
 ### Повторный запуск
 
-Если контейнеры остановились (перезагрузка, выключение Docker):
 ```bash
 cd /путь/к/Chicken-Monitor/project
 docker compose up -d
 ```
 
-### Обновление
+### Остановить / удалить
 
-Если изменили настройки MQTT или обновили код:
 ```bash
-cd /путь/к/Chicken-Monitor/project
-docker compose up -d --build
-```
-
-### Остановка и удаление
-
-Остановить:
-```bash
-cd /путь/к/Chicken-Monitor/project
+# Остановить (данные сохранятся)
 docker compose down
-```
 
-Остановить и удалить все данные:
-```bash
+# Удалить вместе с данными
 docker compose down -v
 ```
 
 ---
 
-## Настройка датчиков
+## Датчики
 
-Датчики должны отправлять данные на MQTT-брокер в топики:
+Датчики шлют данные в MQTT-брокер:
 
-| Топик | Что отправлять | Пример |
-|-------|---------------|--------|
-| `ThermoChicken/1/Temperature` | Температура | `39.5` |
-| `ThermoChicken/1/voltage` | Напряжение батареи | `3.72` |
+```
+ThermoChicken/<ID>/Temperature    →  41.2
+ThermoChicken/<ID>/voltage        →  3.72
+```
 
-Где `1` — номер/ID датчика (буквы, цифры, дефис, до 32 символов).
-
-## Статусы температуры
-
-| Цвет | Значение | Диапазон |
-|------|---------|---------|
-| Зелёный | Норма | 38.0 – 41.5 °C |
-| Жёлтый | Внимание | 41.5 – 42.5 °C |
-| Красный | Опасно | ниже 38 или выше 42.5 °C |
-
-Пороги можно изменить через `setup.ps1`.
+`<ID>` — номер датчика (буквы, цифры, дефис).

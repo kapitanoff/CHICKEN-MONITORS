@@ -9,9 +9,9 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql+psycopg://chicken:chicken@localhost/chicken_monitor"
 
-    TEMP_GREEN_MIN: float = 38.0
-    TEMP_GREEN_MAX: float = 41.5
-    TEMP_YELLOW_MAX: float = 42.5
+    TEMP_GREEN_MIN: float = 40.0
+    TEMP_GREEN_MAX: float = 42.0
+    TEMP_YELLOW_MAX: float = 43.0
 
     class Config:
         env_file = "../.env"

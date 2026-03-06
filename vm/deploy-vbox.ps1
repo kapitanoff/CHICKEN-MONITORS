@@ -197,7 +197,7 @@ $ciDir = Join-Path $VMPath "cloud-init-data"
 New-Item -ItemType Directory -Path $ciDir -Force | Out-Null
 
 $metaDataContent = "instance-id: chicken-monitor-001`nlocal-hostname: chicken-monitor"
-[System.IO.File]::WriteAllText("$ciDir\meta-data", $metaDataContent, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$ciDir\meta-data", $metaDataContent, (New-Object System.Text.UTF8Encoding($false)))
 
 $userDataContent = @"
 #cloud-config
@@ -237,7 +237,7 @@ runcmd:
   - echo "CLOUD_INIT_DONE" > /home/$Username/.cloud-init-complete
   - chown ${Username}:${Username} /home/$Username/.cloud-init-complete
 "@
-[System.IO.File]::WriteAllText("$ciDir\user-data", $userDataContent, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$ciDir\user-data", $userDataContent, (New-Object System.Text.UTF8Encoding($false)))
 
 # Create ISO using oscdimg (Windows ADK) or mkisofs or genisoimage
 # Try multiple tools for ISO creation

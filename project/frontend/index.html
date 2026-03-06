@@ -18,10 +18,11 @@
             </div>
             <button id="btn-manage-groups" class="manage-groups-btn">Управление загонами</button>
         </div>
-        <div class="legend">
-            <span class="dot green"></span> Норма (38–41.5°C)
-            <span class="dot yellow"></span> Предупреждение (41.5–42.5°C)
-            <span class="dot red"></span> Опасно (&lt;38 или &gt;42.5°C)
+        <div class="legend" id="legend">
+            <span class="dot green"></span> <span id="legend-green">Норма</span>
+            <span class="dot yellow"></span> <span id="legend-yellow">Предупреждение</span>
+            <span class="dot red"></span> <span id="legend-red">Опасно</span>
+            <button id="btn-edit-thresholds" class="edit-thresholds-btn" title="Изменить пороги">&#9881;</button>
         </div>
     </header>
 
@@ -76,6 +77,34 @@
                 <button id="btn-create-group">Создать</button>
             </div>
             <div id="groups-list" class="groups-list"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования порогов -->
+    <div id="thresholds-modal" class="modal hidden">
+        <div class="modal-content thresholds-modal-content">
+            <div class="modal-header">
+                <h2>Пороги температуры</h2>
+                <button id="thresholds-modal-close">&times;</button>
+            </div>
+            <div class="thresholds-form">
+                <div class="threshold-row">
+                    <label for="inp-green-min">Норма от (°C):</label>
+                    <input type="number" id="inp-green-min" step="0.1">
+                </div>
+                <div class="threshold-row">
+                    <label for="inp-green-max">Норма до (°C):</label>
+                    <input type="number" id="inp-green-max" step="0.1">
+                </div>
+                <div class="threshold-row">
+                    <label for="inp-yellow-max">Предупреждение до (°C):</label>
+                    <input type="number" id="inp-yellow-max" step="0.1">
+                </div>
+                <div class="thresholds-hint">
+                    Выше «Предупреждение до» или ниже «Норма от» — Опасно (красный)
+                </div>
+                <button id="btn-save-thresholds">Сохранить</button>
+            </div>
         </div>
     </div>
 

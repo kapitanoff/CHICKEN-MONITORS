@@ -20,6 +20,24 @@ let viewMode         = 'all';  // 'all' | 'groups'
 let groupsCache      = [];     // кэш списка групп
 let collapsedGroups  = new Set(); // ID свёрнутых секций
 
+// ─── Загрузка настроек порогов ──────────────────────────────
+
+async function loadSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const s = await res.json();
+        document.getElementById('legend-green').textContent =
+            `Норма (${s.temp_green_min}–${s.temp_green_max}°C)`;
+        document.getElementById('legend-yellow').textContent =
+            `Предупреждение (${s.temp_green_max}–${s.temp_yellow_max}°C)`;
+        document.getElementById('legend-red').textContent =
+            `Опасно (<${s.temp_green_min} или >${s.temp_yellow_max}°C)`;
+    } catch (err) {
+        console.error('Ошибка загрузки настроек:', err);
+    }
+}
+
 // ─── Загрузка групп ─────────────────────────────────────────
 
 async function loadGroups() {
@@ -527,16 +545,72 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// ─── Модалка порогов температуры ─────────────────────────────
+
+function openThresholdsModal() {
+    fetch('/api/settings')
+        .then(r => r.json())
+        .then(s => {
+            document.getElementById('inp-green-min').value = s.temp_green_min;
+            document.getElementById('inp-green-max').value = s.temp_green_max;
+            document.getElementById('inp-yellow-max').value = s.temp_yellow_max;
+            document.getElementById('thresholds-modal').classList.remove('hidden');
+        });
+}
+
+function closeThresholdsModal() {
+    document.getElementById('thresholds-modal').classList.add('hidden');
+}
+
+document.getElementById('btn-edit-thresholds').addEventListener('click', openThresholdsModal);
+document.getElementById('thresholds-modal-close').addEventListener('click', closeThresholdsModal);
+document.getElementById('thresholds-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('thresholds-modal')) closeThresholdsModal();
+});
+
+document.getElementById('btn-save-thresholds').addEventListener('click', async () => {
+    const greenMin = parseFloat(document.getElementById('inp-green-min').value);
+    const greenMax = parseFloat(document.getElementById('inp-green-max').value);
+    const yellowMax = parseFloat(document.getElementById('inp-yellow-max').value);
+
+    if (isNaN(greenMin) || isNaN(greenMax) || isNaN(yellowMax)) return;
+    if (greenMin >= greenMax || greenMax >= yellowMax) {
+        alert('Значения должны идти по возрастанию: Норма от < Норма до < Предупреждение до');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                temp_green_min: greenMin,
+                temp_green_max: greenMax,
+                temp_yellow_max: yellowMax
+            })
+        });
+        if (res.ok) {
+            closeThresholdsModal();
+            await loadSettings();
+            await loadChickens();
+        }
+    } catch (err) {
+        console.error('Ошибка сохранения порогов:', err);
+    }
+});
+
 // ─── Клавиша Escape закрывает любую модалку ─────────────────
 
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         closeModal();
         closeGroupsModal();
+        closeThresholdsModal();
     }
 });
 
 // ─── Запуск ──────────────────────────────────────────────────
 
+loadSettings();
 loadChickens();
 setInterval(loadChickens, 3000);

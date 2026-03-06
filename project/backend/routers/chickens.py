@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Path
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, Integer, case
 from sqlalchemy.sql.expression import cast
@@ -18,6 +19,33 @@ _numeric_id = case(
     (Chicken.chicken_id.op('~')('^[0-9]+$'), cast(Chicken.chicken_id, Integer)),
     else_=None
 )
+
+
+class SettingsUpdate(BaseModel):
+    temp_green_min: float
+    temp_green_max: float
+    temp_yellow_max: float
+
+
+@router.get("/settings")
+def get_settings():
+    return {
+        "temp_green_min": settings.TEMP_GREEN_MIN,
+        "temp_green_max": settings.TEMP_GREEN_MAX,
+        "temp_yellow_max": settings.TEMP_YELLOW_MAX,
+    }
+
+
+@router.put("/settings")
+def update_settings(data: SettingsUpdate):
+    settings.TEMP_GREEN_MIN = data.temp_green_min
+    settings.TEMP_GREEN_MAX = data.temp_green_max
+    settings.TEMP_YELLOW_MAX = data.temp_yellow_max
+    return {
+        "temp_green_min": settings.TEMP_GREEN_MIN,
+        "temp_green_max": settings.TEMP_GREEN_MAX,
+        "temp_yellow_max": settings.TEMP_YELLOW_MAX,
+    }
 
 
 @router.get("/chickens")

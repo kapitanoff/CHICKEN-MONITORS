@@ -169,7 +169,7 @@ Format-Volume -Partition $ciPartition -FileSystem FAT -NewFileSystemLabel "cidat
 $ciDrive = "$($ciPartition.DriveLetter):"
 
 $metaDataContent = "instance-id: chicken-monitor-001`nlocal-hostname: chicken-monitor"
-[System.IO.File]::WriteAllText("$ciDrive\meta-data", $metaDataContent, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$ciDrive\meta-data", $metaDataContent, (New-Object System.Text.UTF8Encoding($false)))
 
 $userDataContent = @"
 #cloud-config
@@ -210,7 +210,7 @@ runcmd:
   - echo "CLOUD_INIT_DONE" > /home/$Username/.cloud-init-complete
   - chown ${Username}:${Username} /home/$Username/.cloud-init-complete
 "@
-[System.IO.File]::WriteAllText("$ciDrive\user-data", $userDataContent, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$ciDrive\user-data", $userDataContent, (New-Object System.Text.UTF8Encoding($false)))
 
 Dismount-VHD -Path $ciDataVhdx
 Write-Ok "Cloud-init data disk created"
