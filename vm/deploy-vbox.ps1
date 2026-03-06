@@ -323,47 +323,109 @@ if (-not $isoCreated) {
     }
 }
 
-# Method 3: IMAPI2 COM (built into Windows 7+)
+# Method 3: Build ISO 9660 in pure PowerShell (no external tools needed)
 if (-not $isoCreated) {
-    Write-Step "No ISO tool found. Trying IMAPI2 COM..."
+    Write-Step "Building cloud-init ISO (pure PowerShell)..."
     try {
-        $fsi = New-Object -ComObject IMAPI2FS.MsftFileSystemImage
-        $fsi.FileSystemsToCreate = 2  # FsiFileSystemJoliet
-        $fsi.VolumeName = "cidata"
+        $metaB = [System.IO.File]::ReadAllBytes("$ciDir\meta-data")
+        $userB = [System.IO.File]::ReadAllBytes("$ciDir\user-data")
+        $S = 2048
 
-        foreach ($file in @("meta-data", "user-data")) {
-            $filePath = "$ciDir\$file"
-            $adoStream = New-Object -ComObject ADODB.Stream
-            $adoStream.Open()
-            $adoStream.Type = 1  # binary
-            $adoStream.LoadFromFile($filePath)
-            $fsi.Root.AddFile($file, $adoStream)
-            $adoStream.Close()
+        $metaN = [Math]::Max(1, [Math]::Ceiling($metaB.Length / $S))
+        $userN = [Math]::Max(1, [Math]::Ceiling($userB.Length / $S))
+        $rLBA = 20; $mLBA = 21; $uLBA = 21 + $metaN; $total = $uLBA + $userN
+        $b = New-Object byte[] ($total * $S)
+
+        # --- Helper: write both-endian uint32 ---
+        function WB32($buf,$o,[uint32]$v) {
+            $buf[$o]=[byte]($v-band 0xFF);$buf[$o+1]=[byte](($v-shr 8)-band 0xFF)
+            $buf[$o+2]=[byte](($v-shr 16)-band 0xFF);$buf[$o+3]=[byte](($v-shr 24)-band 0xFF)
+            $buf[$o+4]=[byte](($v-shr 24)-band 0xFF);$buf[$o+5]=[byte](($v-shr 16)-band 0xFF)
+            $buf[$o+6]=[byte](($v-shr 8)-band 0xFF);$buf[$o+7]=[byte]($v-band 0xFF)
+        }
+        function WB16($buf,$o,[uint16]$v) {
+            $buf[$o]=[byte]($v-band 0xFF);$buf[$o+1]=[byte](($v-shr 8)-band 0xFF)
+            $buf[$o+2]=[byte](($v-shr 8)-band 0xFF);$buf[$o+3]=[byte]($v-band 0xFF)
+        }
+        function WL32($buf,$o,[uint32]$v) {
+            $buf[$o]=[byte]($v-band 0xFF);$buf[$o+1]=[byte](($v-shr 8)-band 0xFF)
+            $buf[$o+2]=[byte](($v-shr 16)-band 0xFF);$buf[$o+3]=[byte](($v-shr 24)-band 0xFF)
+        }
+        function WM32($buf,$o,[uint32]$v) {
+            $buf[$o]=[byte](($v-shr 24)-band 0xFF);$buf[$o+1]=[byte](($v-shr 16)-band 0xFF)
+            $buf[$o+2]=[byte](($v-shr 8)-band 0xFF);$buf[$o+3]=[byte]($v-band 0xFF)
+        }
+        function WStr($buf,$o,$str,$len) {
+            $sb=[System.Text.Encoding]::ASCII.GetBytes($str)
+            $cl=[Math]::Min($sb.Length,$len)
+            for($i=0;$i-lt $cl;$i++){$buf[$o+$i]=$sb[$i]}
+            for($i=$cl;$i-lt $len;$i++){$buf[$o+$i]=0x20}
+        }
+        function WDirRec($buf,$o,$name,[uint32]$lba,[uint32]$sz,[byte]$fl) {
+            $nb=[System.Text.Encoding]::ASCII.GetBytes($name)
+            $rl=33+$nb.Length; if($rl%2-ne 0){$rl++}
+            $buf[$o]=[byte]$rl; WB32 $buf ($o+2) $lba; WB32 $buf ($o+10) $sz
+            $buf[$o+25]=$fl; WB16 $buf ($o+28) ([uint16]1)
+            $buf[$o+32]=[byte]$nb.Length
+            for($i=0;$i-lt $nb.Length;$i++){$buf[$o+33+$i]=$nb[$i]}
+            return $rl
         }
 
-        $resultImage = $fsi.CreateResultImage()
-        $iStream = $resultImage.ImageStream
+        # --- PVD (sector 16) ---
+        $p=16*$S; $b[$p]=1; WStr $b ($p+1) "CD001" 5; $b[$p+6]=1
+        WStr $b ($p+8) " " 32; WStr $b ($p+40) "CIDATA" 32
+        WB32 $b ($p+80) ([uint32]$total); WB16 $b ($p+120) ([uint16]1)
+        WB16 $b ($p+124) ([uint16]1); WB16 $b ($p+128) ([uint16]$S)
+        WB32 $b ($p+132) ([uint32]10)
+        WL32 $b ($p+140) ([uint32]18); WM32 $b ($p+148) ([uint32]19)
+        # Root dir record in PVD
+        $r=$p+156; $b[$r]=34; WB32 $b ($r+2) ([uint32]$rLBA)
+        WB32 $b ($r+10) ([uint32]$S); $b[$r+25]=0x02
+        WB16 $b ($r+28) ([uint16]1); $b[$r+32]=1; $b[$r+33]=0
+        # Identifier fields (spaces)
+        foreach ($off in @(190,318,446,574)) { WStr $b ($p+$off) " " 128 }
+        foreach ($off in @(702,739,776)) { WStr $b ($p+$off) " " 37 }
+        $b[$p+881]=1
 
-        # Read COM IStream using correct parameter signatures
-        $fileOut = [System.IO.File]::Create($SeedIso)
-        $buffer = New-Object byte[] 2048
-        while ($true) {
-            [int]$bytesRead = 0
-            $iStream.Read($buffer, $buffer.Length, [ref]$bytesRead)
-            if ($bytesRead -le 0) { break }
-            $fileOut.Write($buffer, 0, $bytesRead)
-        }
-        $fileOut.Close()
+        # --- VDST (sector 17) ---
+        $v=17*$S; $b[$v]=255; WStr $b ($v+1) "CD001" 5; $b[$v+6]=1
+
+        # --- Path Table L (sector 18) ---
+        $t=18*$S; $b[$t]=1; WL32 $b ($t+2) ([uint32]$rLBA)
+        $b[$t+6]=1; $b[$t+7]=0
+
+        # --- Path Table M (sector 19) ---
+        $t=19*$S; $b[$t]=1; WM32 $b ($t+2) ([uint32]$rLBA)
+        $b[$t+6]=0; $b[$t+7]=1
+
+        # --- Root Directory (sector 20) ---
+        $d=$rLBA*$S; $pos=$d
+        # "." entry
+        $b[$pos]=34; WB32 $b ($pos+2) ([uint32]$rLBA); WB32 $b ($pos+10) ([uint32]$S)
+        $b[$pos+25]=0x02; WB16 $b ($pos+28) ([uint16]1); $b[$pos+32]=1; $b[$pos+33]=0
+        $pos+=34
+        # ".." entry
+        $b[$pos]=34; WB32 $b ($pos+2) ([uint32]$rLBA); WB32 $b ($pos+10) ([uint32]$S)
+        $b[$pos+25]=0x02; WB16 $b ($pos+28) ([uint16]1); $b[$pos+32]=1; $b[$pos+33]=1
+        $pos+=34
+        # File entries (Linux isofs lowercases names and strips ";1")
+        $pos += (WDirRec $b $pos "META-DATA.;1" ([uint32]$mLBA) ([uint32]$metaB.Length) 0)
+        $pos += (WDirRec $b $pos "USER-DATA.;1" ([uint32]$uLBA) ([uint32]$userB.Length) 0)
+
+        # --- File data ---
+        [Array]::Copy($metaB, 0, $b, $mLBA*$S, $metaB.Length)
+        [Array]::Copy($userB, 0, $b, $uLBA*$S, $userB.Length)
+
+        [System.IO.File]::WriteAllBytes($SeedIso, $b)
         $isoCreated = $true
-        Write-Ok "Created via IMAPI2"
+        Write-Ok "ISO created (pure PowerShell)"
     } catch {
-        Write-Warn "IMAPI2 failed: $_"
+        Write-Warn "ISO build failed: $_"
     }
 }
 
 if (-not $isoCreated) {
-    Write-Err "Cannot create cloud-init ISO. Install one of: Windows ADK (oscdimg), cdrtools (mkisofs), or genisoimage"
-    Write-Host "  Download cdrtools: https://sourceforge.net/projects/cdrtoolswin/" -ForegroundColor Yellow
+    Write-Err "Cannot create cloud-init ISO."
     exit 1
 }
 
