@@ -72,8 +72,13 @@ if (-not $VBoxManage) {
 
 function Invoke-VBox {
     param([string[]]$VBoxArgs)
+    # Temporarily allow stderr output (VBoxManage writes progress to stderr)
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     $output = & $VBoxManage @VBoxArgs 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = $oldEAP
+    if ($exitCode -ne 0) {
         Write-Err "VBoxManage $($VBoxArgs[0]) failed: $output"
         throw "VBoxManage failed"
     }
