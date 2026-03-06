@@ -336,24 +336,24 @@ if (-not $isoCreated) {
         $rLBA = 20; $mLBA = 21; $uLBA = 21 + $metaN; $total = $uLBA + $userN
         $b = New-Object byte[] ($total * $S)
 
-        # --- Helper: write both-endian uint32 ---
+        # --- Helper: byte extraction (PS 2.0 has no -shr) ---
+        function B0($v) { [byte]([uint32]$v -band 0xFF) }
+        function B1($v) { [byte]([Math]::Floor([uint32]$v / 256) -band 0xFF) }
+        function B2($v) { [byte]([Math]::Floor([uint32]$v / 65536) -band 0xFF) }
+        function B3($v) { [byte]([Math]::Floor([uint32]$v / 16777216) -band 0xFF) }
+        # Write both-endian uint32 (little then big)
         function WB32($buf,$o,[uint32]$v) {
-            $buf[$o]=[byte]($v-band 0xFF);$buf[$o+1]=[byte](($v-shr 8)-band 0xFF)
-            $buf[$o+2]=[byte](($v-shr 16)-band 0xFF);$buf[$o+3]=[byte](($v-shr 24)-band 0xFF)
-            $buf[$o+4]=[byte](($v-shr 24)-band 0xFF);$buf[$o+5]=[byte](($v-shr 16)-band 0xFF)
-            $buf[$o+6]=[byte](($v-shr 8)-band 0xFF);$buf[$o+7]=[byte]($v-band 0xFF)
+            $buf[$o]=(B0 $v);$buf[$o+1]=(B1 $v);$buf[$o+2]=(B2 $v);$buf[$o+3]=(B3 $v)
+            $buf[$o+4]=(B3 $v);$buf[$o+5]=(B2 $v);$buf[$o+6]=(B1 $v);$buf[$o+7]=(B0 $v)
         }
         function WB16($buf,$o,[uint16]$v) {
-            $buf[$o]=[byte]($v-band 0xFF);$buf[$o+1]=[byte](($v-shr 8)-band 0xFF)
-            $buf[$o+2]=[byte](($v-shr 8)-band 0xFF);$buf[$o+3]=[byte]($v-band 0xFF)
+            $buf[$o]=(B0 $v);$buf[$o+1]=(B1 $v);$buf[$o+2]=(B1 $v);$buf[$o+3]=(B0 $v)
         }
         function WL32($buf,$o,[uint32]$v) {
-            $buf[$o]=[byte]($v-band 0xFF);$buf[$o+1]=[byte](($v-shr 8)-band 0xFF)
-            $buf[$o+2]=[byte](($v-shr 16)-band 0xFF);$buf[$o+3]=[byte](($v-shr 24)-band 0xFF)
+            $buf[$o]=(B0 $v);$buf[$o+1]=(B1 $v);$buf[$o+2]=(B2 $v);$buf[$o+3]=(B3 $v)
         }
         function WM32($buf,$o,[uint32]$v) {
-            $buf[$o]=[byte](($v-shr 24)-band 0xFF);$buf[$o+1]=[byte](($v-shr 16)-band 0xFF)
-            $buf[$o+2]=[byte](($v-shr 8)-band 0xFF);$buf[$o+3]=[byte]($v-band 0xFF)
+            $buf[$o]=(B3 $v);$buf[$o+1]=(B2 $v);$buf[$o+2]=(B1 $v);$buf[$o+3]=(B0 $v)
         }
         function WStr($buf,$o,$str,$len) {
             $sb=[System.Text.Encoding]::ASCII.GetBytes($str)
