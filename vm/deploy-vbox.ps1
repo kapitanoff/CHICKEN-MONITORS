@@ -220,7 +220,8 @@ if (Test-Path $VdiPath) {
         }
     } else {
         Write-Step "Converting IMG to VDI via VBoxManage..."
-        Invoke-VBox @("convertfromraw", $ImgPath, $VdiPath, "--format", "VDI")
+        # Cloud image is qcow2, not raw — use clonemedium (supports qcow2 input)
+        Invoke-VBox @("clonemedium", "disk", $ImgPath, $VdiPath, "--format", "VDI")
     }
 
     Remove-Item $ImgPath -Force -ErrorAction SilentlyContinue
