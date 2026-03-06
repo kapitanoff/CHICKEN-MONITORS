@@ -1,0 +1,557 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ───── Шапка ───── */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    background: #16213e;
+    border-bottom: 1px solid #2a2a4a;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+header h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.view-toggle {
+    display: flex;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.view-btn {
+    padding: 6px 16px;
+    border: none;
+    background: #0f0f1a;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: background 0.15s;
+}
+
+.view-btn:hover {
+    background: #1e1e3a;
+}
+
+.view-btn.active {
+    background: #e94560;
+    color: #fff;
+}
+
+.manage-groups-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #0f0f1a;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: background 0.15s;
+}
+
+.manage-groups-btn:hover {
+    background: #1e1e3a;
+    color: #fff;
+}
+
+.legend {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 0.82rem;
+    color: #aaa;
+}
+
+.dot {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.dot.green  { background: #4caf50; }
+.dot.yellow { background: #ffc107; }
+.dot.red    { background: #f44336; }
+
+/* ───── Сетка ───── */
+main {
+    flex: 1;
+    padding: 20px 28px 80px;
+    overflow-y: auto;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-auto-rows: calc((100vh - 220px) / 3);
+    gap: 20px;
+}
+
+.empty-msg {
+    text-align: center;
+    color: #555;
+    margin-top: 80px;
+    font-size: 1rem;
+}
+
+/* ───── Ячейка ───── */
+.cell {
+    background: #1a1a2e;
+    border: 2px solid #333;
+    border-radius: 14px;
+    padding: 20px 18px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+}
+
+.cell:hover {
+    transform: translateY(-4px);
+}
+
+.cell.green {
+    border-color: #4caf50;
+    box-shadow: 0 0 14px rgba(76, 175, 80, 0.25);
+}
+
+.cell.yellow {
+    border-color: #ffc107;
+    box-shadow: 0 0 14px rgba(255, 193, 7, 0.25);
+}
+
+.cell.red {
+    border-color: #f44336;
+    box-shadow: 0 0 14px rgba(244, 67, 54, 0.3);
+    animation: pulse-red 1.8s ease-in-out infinite;
+}
+
+.cell.unknown {
+    border-color: #444;
+}
+
+@keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 10px rgba(244, 67, 54, 0.2); }
+    50%       { box-shadow: 0 0 26px rgba(244, 67, 54, 0.6); }
+}
+
+.cell-id {
+    font-size: 0.75rem;
+    color: #777;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cell-temp {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.cell-temp .unit {
+    font-size: 1rem;
+    font-weight: 400;
+    color: #aaa;
+}
+
+.cell-voltage {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 10px;
+}
+
+.cell-badge {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.cell.green  .cell-badge { background: rgba(76,175,80,0.15);  color: #4caf50; }
+.cell.yellow .cell-badge { background: rgba(255,193,7,0.15);  color: #ffc107; }
+.cell.red    .cell-badge { background: rgba(244,67,54,0.15);  color: #f44336; }
+.cell.unknown .cell-badge { background: rgba(100,100,100,0.15); color: #777; }
+
+/* ───── Модальное окно ───── */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #16213e;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 700px;
+    padding: 26px;
+    border: 1px solid #2a2a4a;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.modal-header h2 {
+    font-size: 1.1rem;
+}
+
+#modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.6rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+#modal-close:hover {
+    color: #fff;
+}
+
+.modal-info {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 16px;
+}
+
+.time-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.time-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #0f0f1a;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: background 0.15s;
+}
+
+.time-btn:hover {
+    background: #1e1e3a;
+}
+
+.time-btn.active {
+    background: #e94560;
+    border-color: #e94560;
+    color: #fff;
+}
+
+/* ───── Пагинация ───── */
+.pagination {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 14px 0;
+    background: rgba(15, 15, 26, 0.95);
+    border-top: 1px solid #2a2a4a;
+    backdrop-filter: blur(4px);
+    z-index: 50;
+}
+
+.pagination.hidden {
+    display: none;
+}
+
+.page-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #0f0f1a;
+    color: #aaa;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.page-btn:hover:not(:disabled) {
+    background: #1e1e3a;
+    color: #fff;
+}
+
+.page-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+#page-info {
+    font-size: 0.88rem;
+    color: #888;
+    min-width: 120px;
+    text-align: center;
+}
+
+/* ───── Модальное окно ───── */
+.chart-wrap {
+    position: relative;
+    height: 280px;
+}
+
+/* ───── Режим «По загонам» ───── */
+.grid.grouped {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.group-section {
+    background: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.group-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-left: 4px solid #e94560;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.group-section-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.group-section-header .toggle-arrow {
+    font-size: 0.7rem;
+    color: #888;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.group-section.collapsed .toggle-arrow {
+    transform: rotate(-90deg);
+}
+
+.group-section-header .group-name {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #ccc;
+}
+
+.group-section-header .group-count {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #666;
+    margin-left: auto;
+}
+
+/* «Без загона» — приглушённый серый стиль */
+.group-section.ungrouped .group-section-header {
+    border-left-color: #555;
+}
+
+.group-section.ungrouped .group-section-header .group-name {
+    color: #888;
+}
+
+/* Содержимое секции (карточки) */
+.group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-auto-rows: auto;
+    gap: 12px;
+    padding: 14px 18px;
+}
+
+.group-section.collapsed .group-grid {
+    display: none;
+}
+
+/* Компактные карточки в групповом виде */
+.grouped .cell {
+    padding: 14px;
+}
+
+.grouped .cell-temp {
+    font-size: 1.6rem;
+}
+
+.grouped .cell-voltage {
+    margin-top: 6px;
+}
+
+.grouped .cell-badge {
+    margin-top: 8px;
+}
+
+/* ───── Модалка управления загонами ───── */
+.groups-modal-content {
+    max-width: 480px;
+}
+
+.groups-create {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.groups-create input {
+    flex: 1;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.groups-create input:focus {
+    border-color: #e94560;
+}
+
+.groups-create button {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: none;
+    background: #e94560;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+
+.groups-create button:hover {
+    background: #d63050;
+}
+
+.groups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.group-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #0f0f1a;
+    border: 1px solid #2a2a4a;
+    border-radius: 10px;
+}
+
+.group-item-name {
+    font-size: 0.9rem;
+    color: #e0e0e0;
+}
+
+.group-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.group-item-actions button {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.78rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.group-item-actions button:hover {
+    background: #1e1e3a;
+    color: #fff;
+}
+
+.group-item-actions .btn-delete:hover {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    border-color: #f44336;
+}
+
+.groups-empty {
+    text-align: center;
+    color: #555;
+    padding: 20px;
+    font-size: 0.9rem;
+}
+
+/* ───── Выбор загона в модалке курицы ───── */
+.modal-group-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.modal-group-selector label {
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.modal-group-selector select {
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.modal-group-selector select:focus {
+    border-color: #e94560;
+}

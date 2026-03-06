@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chicken Monitor</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <header>
+        <h1>Мониторинг температуры куриц</h1>
+        <div class="header-controls">
+            <div class="view-toggle">
+                <button id="btn-view-all" class="view-btn active">Все</button>
+                <button id="btn-view-groups" class="view-btn">По загонам</button>
+            </div>
+            <button id="btn-manage-groups" class="manage-groups-btn">Управление загонами</button>
+        </div>
+        <div class="legend">
+            <span class="dot green"></span> Норма (38–41.5°C)
+            <span class="dot yellow"></span> Предупреждение (41.5–42.5°C)
+            <span class="dot red"></span> Опасно (&lt;38 или &gt;42.5°C)
+        </div>
+    </header>
+
+    <main>
+        <div id="grid" class="grid"></div>
+        <p id="empty-msg" class="empty-msg">Ожидание данных с датчиков...</p>
+        <div id="pagination" class="pagination hidden">
+            <button id="btn-prev" class="page-btn">&#8249;</button>
+            <span id="page-info">Страница 1 из 1</span>
+            <button id="btn-next" class="page-btn">&#8250;</button>
+        </div>
+    </main>
+
+    <!-- Модальное окно с графиком -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Курица #</h2>
+                <button id="modal-close">&times;</button>
+            </div>
+            <div class="modal-group-selector">
+                <label for="modal-group-select">Загон:</label>
+                <select id="modal-group-select">
+                    <option value="">Без загона</option>
+                </select>
+            </div>
+            <div class="modal-info" id="modal-info"></div>
+            <div class="time-selector">
+                <button class="time-btn active" data-hours="1">1ч</button>
+                <button class="time-btn" data-hours="6">6ч</button>
+                <button class="time-btn" data-hours="24">24ч</button>
+                <button class="time-btn" data-hours="168">7д</button>
+                <button class="time-btn" data-hours="720">30д</button>
+                <button class="time-btn" data-hours="4320">6мес</button>
+                <button class="time-btn" data-hours="8760">1год</button>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно управления загонами -->
+    <div id="groups-modal" class="modal hidden">
+        <div class="modal-content groups-modal-content">
+            <div class="modal-header">
+                <h2>Управление загонами</h2>
+                <button id="groups-modal-close">&times;</button>
+            </div>
+            <div class="groups-create">
+                <input type="text" id="new-group-name" placeholder="Название нового загона" maxlength="50">
+                <button id="btn-create-group">Создать</button>
+            </div>
+            <div id="groups-list" class="groups-list"></div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
