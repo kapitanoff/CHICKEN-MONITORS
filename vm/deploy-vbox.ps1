@@ -29,6 +29,15 @@ if (-not $Password) {
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+# Ensure Git tools (ssh, scp, tar) are in PATH (needed on Windows 7)
+$gitUsrBin = "C:\Program Files\Git\usr\bin"
+if ((Test-Path $gitUsrBin) -and ($env:Path -notlike "*$gitUsrBin*")) {
+    $env:Path += ";$gitUsrBin"
+}
+
+# Try to enable TLS 1.2 (best-effort; on Win7 CLR 2.0 this may not work — curl.exe is used instead)
+try { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { }
+
 $CloudImageUrl = "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img"
 $ImgPath       = Join-Path $VMPath "cloud.img"
 $VdiPath       = Join-Path $VMPath "disk.vdi"
@@ -62,10 +71,10 @@ if (-not $VBoxManage) {
 }
 
 function Invoke-VBox {
-    param([string[]]$Args)
-    $output = & $VBoxManage @Args 2>&1
+    param([string[]]$VBoxArgs)
+    $output = & $VBoxManage @VBoxArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Err "VBoxManage $($Args[0]) failed: $output"
+        Write-Err "VBoxManage $($VBoxArgs[0]) failed: $output"
         throw "VBoxManage failed"
     }
     return $output
@@ -78,8 +87,9 @@ $existingVMs = & $VBoxManage list vms 2>&1
 if ($existingVMs -match "`"$VMName`"") {
     # VM exists — check state and start if needed
     $vmInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1
-    $vmStateLine = $vmInfo | Select-String '^VMState="(.+)"'
-    $vmState = if ($vmStateLine) { $vmStateLine.Matches[0].Groups[1].Value } else { "unknown" }
+    $vmStateLine = $vmInfo | Select-String '^VMState="(.+)"' | Select-Object -First 1
+    $vmState = "unknown"
+    if ($vmStateLine) { $vmState = $vmStateLine.Matches[0].Groups[1].Value }
 
     if ($vmState -ne "running") {
         Write-Step "Starting existing VM '$VMName'..."
@@ -149,14 +159,37 @@ if (Test-Path $VdiPath) {
 } else {
     Write-Step "Downloading Ubuntu 22.04 Cloud Image (~700MB)..."
     Write-Host "  URL: $CloudImageUrl"
-    try {
-        # Use .NET WebClient for better Win7 compatibility
-        $webClient = New-Object System.Net.WebClient
-        $webClient.DownloadFile($CloudImageUrl, $ImgPath)
+
+    # Use Git's bundled curl.exe (supports TLS 1.2 natively, works on Windows 7)
+    $gitCurl = "C:\Program Files\Git\mingw64\bin\curl.exe"
+    if (-not (Test-Path $gitCurl)) {
+        # Try 32-bit Git
+        $gitCurl = "C:\Program Files (x86)\Git\mingw64\bin\curl.exe"
+    }
+    if (-not (Test-Path $gitCurl)) {
+        $cmd = Get-Command curl.exe -ErrorAction SilentlyContinue
+        if ($cmd) { $gitCurl = $cmd.Definition }
+    }
+
+    if (Test-Path $gitCurl) {
+        Write-Host "  Using: $gitCurl" -ForegroundColor Gray
+        & $gitCurl -L -o $ImgPath $CloudImageUrl --progress-bar
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "curl download failed (exit code $LASTEXITCODE)"
+            exit 1
+        }
         Write-Ok "Downloaded: $ImgPath"
-    } catch {
-        Write-Err "Failed to download image: $_"
-        exit 1
+    } else {
+        # Fallback: try .NET WebClient (won't work on Win7 CLR 2.0 with HTTPS)
+        try {
+            $webClient = New-Object System.Net.WebClient
+            $webClient.DownloadFile($CloudImageUrl, $ImgPath)
+            Write-Ok "Downloaded: $ImgPath"
+        } catch {
+            Write-Err "Download failed. Install Git for Windows first (provides curl with TLS 1.2)."
+            Write-Host "  Git 2.46.2: https://github.com/git-for-windows/git/releases/download/v2.46.2.windows.1/Git-2.46.2-64-bit.exe" -ForegroundColor Yellow
+            exit 1
+        }
     }
 
     # Check for qemu-img to convert
@@ -249,7 +282,8 @@ $isoCreated = $false
 
 # Method 1: oscdimg (comes with Windows ADK)
 $oscdimgCmd = Get-Command oscdimg -ErrorAction SilentlyContinue
-$oscdimg = if ($oscdimgCmd) { $oscdimgCmd.Definition } else { $null }
+$oscdimg = $null
+if ($oscdimgCmd) { $oscdimg = $oscdimgCmd.Definition }
 if (-not $oscdimg) {
     $adkPaths = @(
         "${env:ProgramFiles(x86)}\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe",
@@ -267,11 +301,12 @@ if ($oscdimg) {
 
 # Method 2: mkisofs / genisoimage (from cdrtools)
 if (-not $isoCreated) {
+    $mkisofs = $null
     $cmd = Get-Command mkisofs -ErrorAction SilentlyContinue
-    $mkisofs = if ($cmd) { $cmd.Definition } else { $null }
+    if ($cmd) { $mkisofs = $cmd.Definition }
     if (-not $mkisofs) {
         $cmd = Get-Command genisoimage -ErrorAction SilentlyContinue
-        $mkisofs = if ($cmd) { $cmd.Definition } else { $null }
+        if ($cmd) { $mkisofs = $cmd.Definition }
     }
     if ($mkisofs) {
         & $mkisofs -output $SeedIso -volid cidata -joliet -rock "$ciDir"
@@ -279,84 +314,41 @@ if (-not $isoCreated) {
     }
 }
 
-# Method 3: PowerShell .NET — create a minimal ISO image
+# Method 3: IMAPI2 COM (built into Windows 7+)
 if (-not $isoCreated) {
-    Write-Step "No ISO tool found. Creating cloud-init ISO with built-in method..."
-
-    # Use a simple approach: write a minimal ISO 9660 image
-    # We'll use the IMAPI2 COM object (available on Windows 7+)
+    Write-Step "No ISO tool found. Trying IMAPI2 COM..."
     try {
         $fsi = New-Object -ComObject IMAPI2FS.MsftFileSystemImage
         $fsi.FileSystemsToCreate = 2  # FsiFileSystemJoliet
         $fsi.VolumeName = "cidata"
 
-        $metaPath = "$ciDir\meta-data"
-        $userPath = "$ciDir\user-data"
-
-        $fsiStream = New-Object -ComObject ADODB.Stream
-        $fsiStream.Open()
-        $fsiStream.Type = 1  # binary
-        $fsiStream.LoadFromFile($metaPath)
-        $fsi.Root.AddFile("meta-data", $fsiStream)
-        $fsiStream.Close()
-
-        $fsiStream2 = New-Object -ComObject ADODB.Stream
-        $fsiStream2.Open()
-        $fsiStream2.Type = 1
-        $fsiStream2.LoadFromFile($userPath)
-        $fsi.Root.AddFile("user-data", $fsiStream2)
-        $fsiStream2.Close()
-
-        $result = $fsi.CreateResultImage()
-        $resultStream = $result.ImageStream
-
-        # Write IStream to file
-        $isoFileStream = [System.IO.File]::Create($SeedIso)
-        $buffer = New-Object byte[] 65536
-        do {
-            $bytesRead = $resultStream.Read($buffer, 0, $buffer.Length)
-            if ($bytesRead -gt 0) {
-                $isoFileStream.Write($buffer, 0, $bytesRead)
-            }
-        } while ($bytesRead -gt 0)
-        $isoFileStream.Close()
-        $isoCreated = $true
-    } catch {
-        # IMAPI2 approach via IStream
-        try {
-            $fsi = New-Object -ComObject IMAPI2FS.MsftFileSystemImage
-            $fsi.FileSystemsToCreate = 2
-            $fsi.VolumeName = "cidata"
-
-            # Add files using the Root directory
-            foreach ($file in @("meta-data", "user-data")) {
-                $filePath = "$ciDir\$file"
-                $stream = New-Object -ComObject ADODB.Stream
-                $stream.Open()
-                $stream.Type = 1
-                $stream.LoadFromFile($filePath)
-                $fsi.Root.AddFile($file, $stream)
-                $stream.Close()
-            }
-
-            $resultImage = $fsi.CreateResultImage()
-            $imageStream = $resultImage.ImageStream
-
-            # Use BinaryWriter to save
-            $br = New-Object System.IO.BinaryWriter([System.IO.File]::Create($SeedIso))
-            $bytes = New-Object byte[] 2048
-            while ($true) {
-                try {
-                    $read = $imageStream.Read($bytes, $bytes.Length, [ref]$null)
-                    if ($read -eq 0) { break }
-                    $br.Write($bytes, 0, $read)
-                } catch { break }
-            }
-            $br.Close()
-            $isoCreated = $true
-        } catch {
-            Write-Warn "IMAPI2 method also failed: $_"
+        foreach ($file in @("meta-data", "user-data")) {
+            $filePath = "$ciDir\$file"
+            $adoStream = New-Object -ComObject ADODB.Stream
+            $adoStream.Open()
+            $adoStream.Type = 1  # binary
+            $adoStream.LoadFromFile($filePath)
+            $fsi.Root.AddFile($file, $adoStream)
+            $adoStream.Close()
         }
+
+        $resultImage = $fsi.CreateResultImage()
+        $iStream = $resultImage.ImageStream
+
+        # Read COM IStream using correct parameter signatures
+        $fileOut = [System.IO.File]::Create($SeedIso)
+        $buffer = New-Object byte[] 2048
+        while ($true) {
+            [int]$bytesRead = 0
+            $iStream.Read($buffer, $buffer.Length, [ref]$bytesRead)
+            if ($bytesRead -le 0) { break }
+            $fileOut.Write($buffer, 0, $bytesRead)
+        }
+        $fileOut.Close()
+        $isoCreated = $true
+        Write-Ok "Created via IMAPI2"
+    } catch {
+        Write-Warn "IMAPI2 failed: $_"
     }
 }
 

@@ -11,6 +11,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Ensure Git tools (ssh, scp, tar) are in PATH (needed on Windows 7)
+$gitUsrBin = "C:\Program Files\Git\usr\bin"
+if ((Test-Path $gitUsrBin) -and ($env:Path -notlike "*$gitUsrBin*")) {
+    $env:Path += ";$gitUsrBin"
+}
 $VMPath     = "C:\VirtualBox-VMs\Chicken-Monitor"
 $SshKeyPath = Join-Path $VMPath "id_deploy"
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -46,8 +52,9 @@ if ($existingVMs -notmatch "`"$VMName`"") {
 
 # Check VM state, start if needed
 $vmInfo = & $VBoxManage showvminfo $VMName --machinereadable 2>&1
-$vmStateLine = $vmInfo | Select-String '^VMState="(.+)"'
-$vmState = if ($vmStateLine) { $vmStateLine.Matches[0].Groups[1].Value } else { "unknown" }
+$vmStateLine = $vmInfo | Select-String '^VMState="(.+)"' | Select-Object -First 1
+$vmState = "unknown"
+if ($vmStateLine) { $vmState = $vmStateLine.Matches[0].Groups[1].Value }
 
 if ($vmState -ne "running") {
     Write-Host "Starting VM..." -ForegroundColor Cyan
