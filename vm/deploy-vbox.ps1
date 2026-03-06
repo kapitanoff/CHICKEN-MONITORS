@@ -154,7 +154,9 @@ Write-Step "Preparing..."
 New-Item -ItemType Directory -Path $VMPath -Force | Out-Null
 
 if (Test-Path $SshKeyPath) { Remove-Item $SshKeyPath, "$SshKeyPath.pub" -Force -ErrorAction SilentlyContinue }
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 & ssh-keygen -t ed25519 -f $SshKeyPath -N "" -q 2>$null
+$ErrorActionPreference = $oldEAP
 $sshPubKey = [System.IO.File]::ReadAllText("$SshKeyPath.pub").Trim()
 Write-Ok "SSH key generated"
 
@@ -209,7 +211,9 @@ if (Test-Path $VdiPath) {
         Write-Err "No VMDK found inside OVA"
         exit 1
     }
+    $oldEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     & tar --force-local -xf $OvaPath -C $VMPath $vmdkFile
+    $ErrorActionPreference = $oldEAP3
     $VmdkPath = Join-Path $VMPath $vmdkFile
     Write-Ok "Extracted: $vmdkFile"
 
@@ -506,7 +510,10 @@ $cloudInitDone = $false
 while (-not $cloudInitDone -and $elapsed -lt $timeout) {
     Start-Sleep -Seconds 15
     $elapsed += 15
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     $checkResult = & ssh @sshOpts "${Username}@${sshTarget}" "cat /home/$Username/.cloud-init-complete 2>/dev/null" 2>&1
+    $ErrorActionPreference = $oldEAP
     if ("$checkResult" -match "CLOUD_INIT_DONE") {
         $cloudInitDone = $true
     } else {
@@ -532,19 +539,27 @@ if (-not (Test-Path $envFile)) {
 
 $archivePath = Join-Path $VMPath "project.tar.gz"
 $tarExcludes = @("--exclude=.git", "--exclude=deploy.ps1", "--exclude=*.zip", "--exclude=*.vhdx")
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 & tar --force-local -czf $archivePath @tarExcludes -C $ProjectDir .
+$ErrorActionPreference = $oldEAP
 Write-Ok "Project archive created"
 
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $SshKeyPath -P $sshPort "$archivePath" "${Username}@${sshTarget}:/home/$Username/project.tar.gz"
+$ErrorActionPreference = $oldEAP
 Write-Ok "Files copied"
 
 Write-Step "Starting docker compose..."
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 & ssh @sshOpts "${Username}@${sshTarget}" "cd /home/$Username/chicken-monitor && tar -xzf /home/$Username/project.tar.gz && rm /home/$Username/project.tar.gz && sudo docker compose up -d --build"
+$ErrorActionPreference = $oldEAP
 
 Write-Host "  Waiting for containers..."
 Start-Sleep -Seconds 15
 
+$oldEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
 $containerCheck = & ssh @sshOpts "${Username}@${sshTarget}" "sudo docker compose -f /home/$Username/chicken-monitor/docker-compose.yml ps" 2>&1
+$ErrorActionPreference = $oldEAP
 Write-Host "`n  Containers:"
 Write-Host "  $containerCheck"
 

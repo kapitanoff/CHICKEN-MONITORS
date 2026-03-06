@@ -212,6 +212,16 @@ runcmd:
 "@
 [System.IO.File]::WriteAllText("$ciDrive\user-data", $userDataContent, (New-Object System.Text.UTF8Encoding($false)))
 
+$networkConfig = @"
+version: 2
+ethernets:
+  id0:
+    match:
+      driver: hv_netvsc
+    dhcp4: true
+"@
+[System.IO.File]::WriteAllText("$ciDrive\network-config", $networkConfig, (New-Object System.Text.UTF8Encoding($false)))
+
 Dismount-VHD -Path $ciDataVhdx
 Write-Ok "Cloud-init data disk created"
 
