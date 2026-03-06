@@ -198,7 +198,10 @@ if (Test-Path $VdiPath) {
     # OVA is a tar archive containing a VMDK disk image
     Write-Step "Extracting VMDK from OVA..."
     $vmdkFile = $null
-    $tarList = & tar -tf $OvaPath 2>&1
+    $oldEAP2 = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $tarList = & tar --force-local -tf $OvaPath 2>&1
+    $ErrorActionPreference = $oldEAP2
     foreach ($entry in $tarList) {
         if ("$entry" -match '\.vmdk$') { $vmdkFile = "$entry".Trim(); break }
     }
@@ -206,7 +209,7 @@ if (Test-Path $VdiPath) {
         Write-Err "No VMDK found inside OVA"
         exit 1
     }
-    & tar -xf $OvaPath -C $VMPath $vmdkFile
+    & tar --force-local -xf $OvaPath -C $VMPath $vmdkFile
     $VmdkPath = Join-Path $VMPath $vmdkFile
     Write-Ok "Extracted: $vmdkFile"
 
@@ -467,7 +470,7 @@ if (-not (Test-Path $envFile)) {
 
 $archivePath = Join-Path $VMPath "project.tar.gz"
 $tarExcludes = @("--exclude=.git", "--exclude=deploy.ps1", "--exclude=*.zip", "--exclude=*.vhdx")
-& tar -czf $archivePath @tarExcludes -C $ProjectDir .
+& tar --force-local -czf $archivePath @tarExcludes -C $ProjectDir .
 Write-Ok "Project archive created"
 
 & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $SshKeyPath -P $sshPort "$archivePath" "${Username}@${sshTarget}:/home/$Username/project.tar.gz"

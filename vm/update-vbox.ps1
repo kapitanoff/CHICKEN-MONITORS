@@ -87,7 +87,7 @@ $sshOpts = @("-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/nu
 # Archive and copy project
 Write-Host "Copying project..." -ForegroundColor Cyan
 $archivePath = Join-Path $VMPath "project.tar.gz"
-& tar -czf $archivePath --exclude=.git --exclude=deploy.ps1 --exclude=deploy-vbox.ps1 -C $ProjectDir .
+& tar --force-local -czf $archivePath --exclude=.git --exclude=deploy.ps1 --exclude=deploy-vbox.ps1 -C $ProjectDir .
 & scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $SshKeyPath -P $sshPort "$archivePath" "${Username}@${sshTarget}:/home/$Username/project.tar.gz"
 
 # Extract and rebuild
