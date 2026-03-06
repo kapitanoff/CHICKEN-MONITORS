@@ -27,6 +27,11 @@
 
 Откройте **PowerShell**. Для этого нажмите Win+R, введите `powershell`, нажмите Enter.
 
+Если PowerShell выдаёт ошибку **«Выполнение скриптов запрещено»**, выполните:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
+```
+
 Перейдите в папку проекта (укажите путь туда, куда вы распаковали проект):
 ```powershell
 cd C:\Chicken-Monitor\project
@@ -105,6 +110,7 @@ cd C:\Chicken-Monitor
 
 Включите Hyper-V (PowerShell от администратора):
 ```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
 ```
 
@@ -173,7 +179,7 @@ cd /путь/к/Chicken-Monitor/project
 ./setup.sh
 ```
 
-**Windows** — откройте PowerShell:
+**Windows** — откройте PowerShell (если скрипты запрещены, сначала выполните `Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser`):
 ```powershell
 cd C:\Chicken-Monitor\project
 .\setup.ps1
