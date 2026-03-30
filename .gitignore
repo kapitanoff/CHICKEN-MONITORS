@@ -1,0 +1,12 @@
+.env
+!.env.example
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.db
+*.sqlite3
+*.log
+node_modules/
+.idea/
+.vscode/
