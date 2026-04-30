@@ -1,0 +1,238 @@
+ПАМЯТКА: КАК ПЕРЕНЕСТИ, ЗАПУСТИТЬ И ПОКАЗАТЬ CHICKEN MONITOR
+
+Эти команды лучше выполнять в PowerShell.
+Командную строку cmd лучше не использовать, потому что test-data.ps1 - это PowerShell-скрипт.
+
+
+1. ГДЕ ОТКРЫТЬ POWERSHELL
+
+Откройте папку проекта:
+
+C:\Users\kapit\OneDrive\Desktop\CHICKEN-MONITORS-production
+
+В пустом месте папки нажмите правой кнопкой мыши и выберите:
+
+Открыть в терминале
+
+или:
+
+Открыть окно PowerShell здесь
+
+Если PowerShell открыт не в папке проекта, выполните:
+
+cd "C:\Users\kapit\OneDrive\Desktop\CHICKEN-MONITORS-production"
+
+
+2. КАК ПЕРЕНЕСТИ ИЗМЕНЕНИЯ НА ПК ФЕРМЫ ЧЕРЕЗ GIT
+
+Сначала на своем компьютере нужно отправить изменения в GitHub:
+
+git add README.md frontend/app.js frontend/index.html frontend/style.css setup.sh vm/deploy-vbox.ps1 vm/deploy.ps1 vm/update-vbox.ps1 vm/update.ps1 test-data.ps1 FARM_TRANSFER_INSTRUCTIONS.txt
+git commit -m "Update monitor UI and add farm demo instructions"
+git push origin main
+
+Потом на ПК фермы выполнить:
+
+cd "ПУТЬ_К_ПАПКЕ_ПРОЕКТА_НА_ФЕРМЕ"
+git pull
+docker compose up -d --build
+
+Если путь на ферме такой же, как у меня, команда будет:
+
+cd "C:\Users\kapit\OneDrive\Desktop\CHICKEN-MONITORS-production"
+git pull
+docker compose up -d --build
+
+После запуска открыть в браузере:
+
+http://localhost:8000
+
+И нажать Ctrl + F5.
+
+
+3. КАК ПЕРЕНЕСТИ БЕЗ GIT, ЧЕРЕЗ ZIP
+
+На своем компьютере:
+
+1. Сделайте ZIP-архив проекта.
+2. Не кладите в архив .env, если не хотите переносить пароли и настройки.
+
+На ПК фермы:
+
+1. Откройте PowerShell в старой папке проекта.
+2. Остановите проект:
+
+docker compose down
+
+3. Сохраните настройки:
+
+Copy-Item .env .env.backup
+
+4. Распакуйте новый ZIP поверх старой папки проекта.
+5. Убедитесь, что файл .env остался на месте.
+6. Запустите:
+
+docker compose up -d --build
+
+После запуска открыть:
+
+http://localhost:8000
+
+И нажать Ctrl + F5.
+
+
+4. КАК ПРОСТО ЗАПУСТИТЬ ПРОЕКТ
+
+Откройте PowerShell в папке проекта и выполните:
+
+docker compose up -d
+
+Открыть в браузере:
+
+http://localhost:8000
+
+
+5. КАК ОСТАНОВИТЬ ПРОЕКТ БЕЗ УДАЛЕНИЯ ДАННЫХ
+
+docker compose down
+
+История температур при этом сохраняется.
+
+
+6. КАК ПЕРЕЗАПУСТИТЬ ПРОЕКТ
+
+docker compose restart
+
+Если меняли .env, лучше так:
+
+docker compose down
+docker compose up -d
+
+
+7. КАК ОБНОВИТЬ ПРОЕКТ
+
+Если проект установлен через Git:
+
+git pull
+docker compose up -d --build
+
+Если проект обновили через ZIP:
+
+docker compose down
+docker compose up -d --build
+
+
+8. КАК ПРОВЕРИТЬ, ЧТО ВСЕ РАБОТАЕТ
+
+docker compose ps
+
+Контейнеры должны быть в состоянии Up или healthy.
+
+Посмотреть последние логи:
+
+docker compose logs --tail=100 backend
+
+
+9. КАК ДОБАВИТЬ ТЕСТОВЫЕ ДАННЫЕ ДЛЯ ПОКАЗА 40/60 КВАДРАТИКОВ
+
+Откройте PowerShell в папке проекта и выполните:
+
+.\test-data.ps1
+
+Скрипт добавит 100 тестовых датчиков:
+
+- 40 Опасно
+- 20 Предупреждение
+- 40 Норма
+
+Также будут добавлены демо-загоны.
+
+После этого открыть:
+
+http://localhost:8000
+
+И нажать Ctrl + F5.
+
+Если PowerShell запрещает запуск скрипта:
+
+powershell -ExecutionPolicy Bypass -File .\test-data.ps1
+
+
+10. КАК ДОБАВИТЬ ДРУГОЕ КОЛИЧЕСТВО ТЕСТОВЫХ ДАННЫХ
+
+Например, добавить 60 тестовых датчиков:
+
+.\test-data.ps1 -Count 60
+
+Например, добавить 40 тестовых датчиков:
+
+.\test-data.ps1 -Count 40
+
+
+11. КАК УДАЛИТЬ ТОЛЬКО ТЕСТОВЫЕ ДАННЫЕ
+
+.\test-data.ps1 -Action clear
+
+Эта команда удаляет только:
+
+- куриц с ID, которые начинаются на TEST
+- тестовые демо-загоны
+
+Реальные курицы не удаляются.
+
+
+12. ЧЕГО НЕ ДЕЛАТЬ, ЕСЛИ НУЖНО СОХРАНИТЬ ИСТОРИЮ
+
+Не выполняйте эту команду без необходимости:
+
+docker compose down -v
+
+Она удаляет базу данных и всю историю температур.
+
+
+13. ЕСЛИ НА ФЕРМЕ WINDOWS 7 / VIRTUALBOX
+
+Обычный Docker Desktop на Windows 7 не работает.
+
+Для VirtualBox-варианта обновление делается так:
+
+cd vm
+.\update-vbox.ps1
+
+После обновления открыть:
+
+http://localhost:8080
+
+Не используйте -ResetDB, если не хотите удалить историю температур.
+
+Команда ниже удаляет базу:
+
+.\update-vbox.ps1 -ResetDB
+
+
+14. КОРОТКАЯ ПАМЯТКА КОМАНД
+
+Запустить:
+docker compose up -d
+
+Остановить:
+docker compose down
+
+Перезапустить:
+docker compose restart
+
+Обновить через Git:
+git pull
+docker compose up -d --build
+
+Добавить тестовые данные:
+.\test-data.ps1
+
+Удалить тестовые данные:
+.\test-data.ps1 -Action clear
+
+Проверить состояние:
+docker compose ps
+
+Посмотреть логи:
+docker compose logs --tail=100 backend
