@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = "Stop"
 $VMPath     = "C:\Hyper-V\Chicken-Monitor"
 $SshKeyPath = Join-Path $VMPath "id_deploy"
-$ProjectDir = Join-Path (Split-Path $PSScriptRoot -Parent) "project"
+$ProjectDir = Split-Path $PSScriptRoot -Parent
 
 # Check VM exists and running
 $vm = Get-VM -Name $VMName -ErrorAction SilentlyContinue

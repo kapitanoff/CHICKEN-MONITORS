@@ -62,12 +62,12 @@ fi
 # Temperature thresholds
 echo ""
 echo "--- Temperature thresholds (press Enter for defaults) ---"
-read -p "Normal min [38.0]: " temp_min
-temp_min="${temp_min:-38.0}"
-read -p "Normal max [41.5]: " temp_max
-temp_max="${temp_max:-41.5}"
-read -p "Warning max [42.5]: " temp_warn
-temp_warn="${temp_warn:-42.5}"
+read -p "Normal min [40.0]: " temp_min
+temp_min="${temp_min:-40.0}"
+read -p "Normal max [42.0]: " temp_max
+temp_max="${temp_max:-42.0}"
+read -p "Warning max [43.0]: " temp_warn
+temp_warn="${temp_warn:-43.0}"
 
 # Write .env
 cat > "$ENV_FILE" << EOF

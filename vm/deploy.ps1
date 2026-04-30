@@ -33,7 +33,7 @@ $ImgPath       = Join-Path $VMPath "cloud.img"
 $VhdxPath      = Join-Path $VMPath "disk.vhdx"
 $CloudInitIso  = Join-Path $VMPath "cloud-init.iso"
 $SshKeyPath    = Join-Path $VMPath "id_deploy"
-$ProjectDir    = Join-Path (Split-Path $PSScriptRoot -Parent) "project"
+$ProjectDir    = Split-Path $PSScriptRoot -Parent
 
 function Write-Step  { param($msg) Write-Host "`n[$((Get-Date).ToString('HH:mm:ss'))] $msg" -ForegroundColor Cyan }
 function Write-Ok    { param($msg) Write-Host "  OK: $msg" -ForegroundColor Green }

@@ -22,7 +22,7 @@ if ((Test-Path $gitUsrBin) -and ($env:Path -notlike "*$gitUsrBin*")) {
 $VMPath     = "C:\VirtualBox-VMs\Chicken-Monitor"
 $SshKeyPath = Join-Path $VMPath "id_deploy"
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = Join-Path (Split-Path -Parent $ScriptDir) "project"
+$ProjectDir = Split-Path -Parent $ScriptDir
 $Username   = "ubuntu"
 $sshPort    = 2222
 $sshTarget  = "127.0.0.1"

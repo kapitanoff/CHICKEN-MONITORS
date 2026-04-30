@@ -44,7 +44,7 @@ $VdiPath       = Join-Path $VMPath "disk.vdi"
 $SeedIso       = Join-Path $VMPath "seed.iso"
 $SshKeyPath    = Join-Path $VMPath "id_deploy"
 $ScriptDir     = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir    = Join-Path (Split-Path -Parent $ScriptDir) "project"
+$ProjectDir    = Split-Path -Parent $ScriptDir
 
 function Write-Step  { param($msg) Write-Host "`n[$((Get-Date).ToString('HH:mm:ss'))] $msg" -ForegroundColor Cyan }
 function Write-Ok    { param($msg) Write-Host "  OK: $msg" -ForegroundColor Green }
